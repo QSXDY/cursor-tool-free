@@ -23,8 +23,9 @@ app = None
 
 def cleanup():
     """清理资源"""
-    global main_window
-    if main_window:
+    global main_window, app
+    # main_window和app在main()函数中赋值
+    if main_window is not None:
         print("🔧 清理线程资源...")
         try:
             # 清理刷新线程
