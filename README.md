@@ -55,8 +55,8 @@ flake8 . --max-line-length=120
 # 运行测试
 pytest
 
-# 构建可执行文件
-pyinstaller --onefile --windowed main.py
+# 构建可执行文件（包含图标资源）
+pyinstaller CursorToolFree.spec
 ```
 
 ## ✨ 功能特点
