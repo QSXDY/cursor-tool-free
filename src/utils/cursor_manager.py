@@ -549,10 +549,37 @@ class CursorManager:
             ]
             key_files = ["Cursor.exe", "resources/app/out/main.js"]
         elif system == "darwin":
-            possible_paths = ["/Applications/Cursor.app"]
+            possible_paths = [
+                # 标准安装位置
+                "/Applications/Cursor.app",
+                # 用户安装位置
+                os.path.expanduser("~/Applications/Cursor.app"),
+                # Homebrew安装
+                "/usr/local/Caskroom/cursor/latest/Cursor.app",
+                "/opt/homebrew/Caskroom/cursor/latest/Cursor.app",
+                # 直接下载安装
+                os.path.expanduser("~/Downloads/Cursor.app"),
+                os.path.expanduser("~/Desktop/Cursor.app"),
+            ]
             key_files = ["Contents/MacOS/Cursor", "Contents/Resources/app/out/main.js"]
         else:  # Linux
-            possible_paths = ["/usr/local/bin/cursor", "/usr/bin/cursor", os.path.expanduser("~/.local/share/cursor")]
+            possible_paths = [
+                # 系统安装
+                "/usr/local/bin/cursor",
+                "/usr/bin/cursor",
+                "/opt/cursor",
+                # 用户安装
+                os.path.expanduser("~/.local/bin/cursor"),
+                os.path.expanduser("~/.local/share/cursor"),
+                os.path.expanduser("~/cursor"),
+                # Snap包
+                "/snap/bin/cursor",
+                # AppImage
+                os.path.expanduser("~/Applications/Cursor.AppImage"),
+                os.path.expanduser("~/Downloads/cursor"),
+                # Flatpak
+                os.path.expanduser("~/.var/app/com.cursor.Cursor"),
+            ]
             key_files = ["cursor", "resources/app/out/main.js"]
 
         for path in possible_paths:

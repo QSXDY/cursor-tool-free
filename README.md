@@ -62,12 +62,13 @@ pyinstaller --onefile --windowed main.py
 ## ✨ 功能特点
 
 - 🔐 专业的Cursor账号管理系统
-- 📱 PyQt6现代化用户界面
+- 📱 PyQt6现代化用户界面  
 - 💾 本地化数据存储
 - 🔄 异步操作和状态管理
 - 🛡️ 账号安全与隐私保护
 - 🌐 浏览器Cookie导入支持
 - 📊 使用额度实时监控
+- 🌍 **完整跨平台支持** (Windows/macOS/Linux)
 
 ## 📋 主要功能
 
@@ -76,6 +77,24 @@ pyinstaller --onefile --windowed main.py
 - **状态监控**: 实时显示账号状态和使用情况
 - **配置管理**: 灵活的应用配置和设置
 - **数据安全**: 本地存储，保护用户隐私
+- **跨平台兼容**: 智能检测各平台Cursor安装和浏览器
+
+## 🌍 跨平台支持详情
+
+### Windows
+- **Cursor检测**: 自动检测标准安装位置
+- **浏览器支持**: Chrome、Edge、Firefox
+- **安装方式**: 标准installer、便携版
+
+### macOS  
+- **Cursor检测**: 标准安装、Homebrew、用户目录
+- **浏览器支持**: Chrome、Safari、Edge、Firefox、Chromium
+- **安装方式**: .app包、Homebrew Cask
+
+### Linux
+- **Cursor检测**: 系统安装、AppImage、Snap、Flatpak
+- **浏览器支持**: Chrome、Chromium、Firefox、系统默认
+- **安装方式**: APT/YUM/Pacman、Snap、Flatpak、AppImage
 
 ## 🔧 系统要求
 

@@ -9,6 +9,7 @@ from PyQt6.QtGui import *
 from PyQt6.QtWidgets import *
 
 from ..utils.cookie_import_manager import CookieImportManager
+from ..utils.platform_utils import get_user_agent
 
 # 🔧 单账号模式：直接API调用，确保"一号一码"安全性
 
@@ -267,7 +268,7 @@ eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
                         "content-type": "application/json",
                         "origin": "https://cursor.com",
                         "referer": "https://cursor.com/dashboard",
-                        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                        "user-agent": get_user_agent(),
                     }
 
                     cookies = {"WorkosCursorSessionToken": session_token, "NEXT_LOCALE": "zh"}

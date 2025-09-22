@@ -49,7 +49,7 @@ class CursorAccountManagerPro(QMainWindow):
         self.create_menu_bar()
         self.load_accounts()
 
-        # 每次启动都检查Cursor路径配置（严格模式）
+        # 每次启动都检查Cursor路径配置（严格模式，跨平台）
         QTimer.singleShot(1000, self.check_cursor_installation_paths)
 
         # 启动时自动刷新当前账号信息 - 让用户立即看到当前状态
@@ -1791,7 +1791,12 @@ class CursorAccountManagerPro(QMainWindow):
                     "请确保目录中包含以下文件：\n"
                     "• Windows: Cursor.exe\n"
                     "• macOS: Contents/MacOS/Cursor\n"
-                    "• Linux: cursor\n\n"
+                    "• Linux: cursor 可执行文件\n\n"
+                    "支持的Linux安装方式:\n"
+                    "- AppImage便携版\n"
+                    "- 系统包管理器安装\n"
+                    "- Snap/Flatpak包\n"
+                    "- 源码编译安装\n\n"
                     "是否重新选择路径？",
                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                     QMessageBox.StandardButton.Yes,

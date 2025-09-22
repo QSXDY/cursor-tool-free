@@ -11,6 +11,8 @@ import re
 import time
 from typing import Callable, Dict, List, Optional, Tuple
 
+from .platform_utils import get_user_agent
+
 
 class SubscriptionBatchProcessor:
     """统一的订阅批处理器，用于解析导入和一键刷新 -"""
@@ -146,7 +148,7 @@ class SubscriptionBatchProcessor:
                 "content-type": "application/json",
                 "origin": "https://cursor.com",
                 "referer": "https://cursor.com/cn/dashboard",
-                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "user-agent": get_user_agent(),
             }
 
             # 使用Cookie -

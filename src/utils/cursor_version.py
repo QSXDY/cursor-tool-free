@@ -13,7 +13,14 @@ class CursorVersionDetector:
     @staticmethod
     def get_cursor_paths():
         """获取Cursor路径"""
-        from ..config import Config
+        try:
+            from ..config import Config
+        except ImportError:
+            # 直接导入模式（用于测试）
+            import sys
+            import os
+            sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+            from config import Config
 
         config = Config.get_instance()
         import platform
@@ -33,10 +40,37 @@ class CursorVersionDetector:
                     os.path.join(os.getenv("PROGRAMFILES(X86)", ""), "Cursor"),
                 ]
             elif system == "Darwin":
-                possible_paths = ["/Applications/Cursor.app/Contents/Resources/app"]
+                possible_paths = [
+                    # 标准安装
+                    "/Applications/Cursor.app/Contents/Resources/app",
+                    # 用户安装
+                    os.path.expanduser("~/Applications/Cursor.app/Contents/Resources/app"),
+                    # Homebrew安装
+                    "/usr/local/Caskroom/cursor/latest/Cursor.app/Contents/Resources/app",
+                    "/opt/homebrew/Caskroom/cursor/latest/Cursor.app/Contents/Resources/app",
+                    # 下载位置
+                    os.path.expanduser("~/Downloads/Cursor.app/Contents/Resources/app"),
+                    os.path.expanduser("~/Desktop/Cursor.app/Contents/Resources/app"),
+                ]
             else:
-                # Linux等其他系统
-                possible_paths = []
+                # Linux平台 - 完整路径支持
+                possible_paths = [
+                    # AppImage便携版本
+                    os.path.expanduser("~/Applications/Cursor.AppImage"),
+                    os.path.expanduser("~/.local/bin/cursor"),
+                    # 系统安装版本
+                    "/usr/local/bin/cursor",
+                    "/usr/bin/cursor",
+                    "/opt/cursor/cursor",
+                    # Snap包管理
+                    "/snap/bin/cursor",
+                    # 用户自定义安装
+                    os.path.expanduser("~/.local/share/cursor"),
+                    os.path.expanduser("~/cursor"),
+                    os.path.expanduser("~/Downloads/cursor"),
+                    # Flatpak安装
+                    os.path.expanduser("~/.var/app/com.cursor.Cursor"),
+                ]
 
         for base_path in possible_paths:
             if "*" in base_path:

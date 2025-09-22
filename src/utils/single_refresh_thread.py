@@ -10,6 +10,7 @@ import requests
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from .interruptible_api_call import InterruptibleApiCall
+from .platform_utils import get_platform_headers, get_user_agent
 
 
 class SingleRefreshThread(QThread):
@@ -71,7 +72,7 @@ class SingleRefreshThread(QThread):
                         "content-type": "application/json",
                         "origin": "https://cursor.com",
                         "referer": "https://cursor.com/cn/dashboard",
-                        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                        "user-agent": get_user_agent(),
                     }
 
                     cookies = {"WorkosCursorSessionToken": session_token, "NEXT_LOCALE": "zh"}
@@ -152,11 +153,11 @@ class SingleRefreshThread(QThread):
                 "referer": "https://cursor.com/cn/dashboard",
                 "sec-ch-ua": '"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"',
                 "sec-ch-ua-mobile": "?0",
-                "sec-ch-ua-platform": '"Windows"',
+                **get_platform_headers(),
                 "sec-fetch-dest": "empty",
                 "sec-fetch-mode": "cors",
                 "sec-fetch-site": "same-origin",
-                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "user-agent": get_user_agent(),
             }
 
             # 🔧 使用Cookie而不是Authorization header

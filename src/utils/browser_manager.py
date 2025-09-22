@@ -90,26 +90,76 @@ class BrowserManager:
             return None
 
     def _find_browser_path(self):
-        """查找可用的浏览器路径 - 简化版"""
+        """查找可用的浏览器路径 - 完整跨平台版本"""
+
         if sys.platform == "win32":
-            # Windows平台常见路径
-            chrome_paths = [
+            # Windows平台 - Chrome优先，然后Edge
+            browser_paths = [
+                # Chrome路径
                 os.path.expandvars(r"%PROGRAMFILES%\Google\Chrome\Application\chrome.exe"),
                 os.path.expandvars(r"%PROGRAMFILES(X86)%\Google\Chrome\Application\chrome.exe"),
                 os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"),
-            ]
-
-            edge_paths = [
+                # Edge路径
                 os.path.expandvars(r"%PROGRAMFILES(X86)%\Microsoft\Edge\Application\msedge.exe"),
                 os.path.expandvars(r"%PROGRAMFILES%\Microsoft\Edge\Application\msedge.exe"),
+                # Firefox路径
+                os.path.expandvars(r"%PROGRAMFILES%\Mozilla Firefox\firefox.exe"),
+                os.path.expandvars(r"%PROGRAMFILES(X86)%\Mozilla Firefox\firefox.exe"),
             ]
 
-            # 优先Chrome，然后Edge
-            for path in chrome_paths + edge_paths:
-                if os.path.exists(path):
-                    return path
+        elif sys.platform == "darwin":
+            # macOS平台 - Chrome优先，然后Safari/Edge/Firefox
+            browser_paths = [
+                # Chrome
+                "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+                # Safari（系统自带）
+                "/Applications/Safari.app/Contents/MacOS/Safari",
+                # Edge
+                "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+                # Firefox
+                "/Applications/Firefox.app/Contents/MacOS/firefox",
+                # Chromium
+                "/Applications/Chromium.app/Contents/MacOS/Chromium",
+                # 用户安装位置
+                os.path.expanduser("~/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
+            ]
 
-        return None  # 让DrissionPage使用默认路径
+        else:
+            # Linux平台 - Chrome/Chromium优先，然后Firefox
+            browser_paths = [
+                # Chrome
+                "/usr/bin/google-chrome",
+                "/usr/bin/google-chrome-stable",
+                "/usr/bin/google-chrome-beta",
+                "/usr/bin/google-chrome-unstable",
+                # Chromium
+                "/usr/bin/chromium-browser",
+                "/usr/bin/chromium",
+                # Snap包
+                "/snap/bin/chromium",
+                "/snap/bin/firefox",
+                "/snap/bin/code",  # VS Code内置浏览器
+                # Flatpak
+                "/var/lib/flatpak/exports/bin/org.chromium.Chromium",
+                "/var/lib/flatpak/exports/bin/org.mozilla.firefox",
+                # Firefox
+                "/usr/bin/firefox",
+                "/usr/bin/firefox-esr",
+                # 用户本地安装
+                os.path.expanduser("~/.local/bin/chrome"),
+                os.path.expanduser("~/.local/bin/chromium"),
+                os.path.expanduser("~/.local/bin/firefox"),
+            ]
+
+        # 查找第一个存在的浏览器
+        for path in browser_paths:
+            if os.path.exists(path):
+                self.logger.info(f"🔍 找到浏览器: {path}")
+                return path
+
+        # 都找不到，返回None让DrissionPage使用系统默认
+        self.logger.warning("⚠️ 未找到指定浏览器，将使用系统默认浏览器")
+        return None
 
     def set_auth_cookie(self, page, user_id: str, access_token: str):
         """

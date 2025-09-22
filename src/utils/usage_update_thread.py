@@ -7,6 +7,8 @@ import os
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
+from .platform_utils import get_platform_headers, get_user_agent
+
 
 class UsageUpdateThread(QThread):
     """账户使用额度更新线程"""
@@ -211,15 +213,11 @@ class UsageUpdateThread(QThread):
                 "sec-ch-ua-arch": '"x86"',
                 "sec-ch-ua-bitness": '"64"',
                 "sec-ch-ua-mobile": "?0",
-                "sec-ch-ua-platform": '"Windows"',
-                "sec-ch-ua-platform-version": '"19.0.0"',
+                **get_platform_headers(),
                 "sec-fetch-dest": "empty",
                 "sec-fetch-mode": "cors",
                 "sec-fetch-site": "same-origin",
-                "user-agent": (
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                    "(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0"
-                ),
+                "user-agent": get_user_agent(),
                 "priority": "u=1, i",
             }
 
@@ -313,15 +311,11 @@ class UsageUpdateThread(QThread):
                 "sec-ch-ua-arch": '"x86"',
                 "sec-ch-ua-bitness": '"64"',
                 "sec-ch-ua-mobile": "?0",
-                "sec-ch-ua-platform": '"Windows"',
-                "sec-ch-ua-platform-version": '"19.0.0"',
+                **get_platform_headers(),
                 "sec-fetch-dest": "empty",
                 "sec-fetch-mode": "cors",
                 "sec-fetch-site": "same-origin",
-                "user-agent": (
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                    "(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0"
-                ),
+                "user-agent": get_user_agent(),
                 "priority": "u=1, i",
             }
 
@@ -446,11 +440,11 @@ class UsageUpdateThread(QThread):
                 "referer": "https://cursor.com/cn/dashboard?tab=billing",
                 "sec-ch-ua": '"Chromium";v="140", "Not=A?Brand";v="24", "Microsoft Edge";v="140"',
                 "sec-ch-ua-mobile": "?0",
-                "sec-ch-ua-platform": '"Windows"',
+                **get_platform_headers(),
                 "sec-fetch-dest": "empty",
                 "sec-fetch-mode": "cors",
                 "sec-fetch-site": "same-origin",
-                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "user-agent": get_user_agent(),
                 "priority": "u=1, i",
             }
 
