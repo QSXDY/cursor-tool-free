@@ -24,15 +24,39 @@ cursor_tool_free/
 
 ## 🚀 快速开始
 
+### 👥 普通用户
+
 ```bash
-# 安装Python依赖
+# 安装基础依赖
 pip install -r requirements.txt
 
-# 安装浏览器依赖（可选）
+# 安装浏览器依赖（可选，用于Cookie导入）
 pip install -r requirements_browser.txt
 
 # 运行程序
 python main.py
+```
+
+### 👨‍💻 开发者（二次开发）
+
+```bash
+# 安装所有依赖（包括开发工具）
+pip install -r requirements.txt
+pip install -r requirements_browser.txt
+pip install -r requirements-dev.txt
+
+# 代码格式化（推荐在提交前运行）
+black . --line-length 120
+isort . --profile black
+
+# 代码质量检查
+flake8 . --max-line-length=120
+
+# 运行测试
+pytest
+
+# 构建可执行文件
+pyinstaller --onefile --windowed main.py
 ```
 
 ## ✨ 功能特点
@@ -55,6 +79,45 @@ python main.py
 
 ## 🔧 系统要求
 
-- Python 3.10.11
+- Python 3.10.11+
 - PyQt6
 - 支持的操作系统: Windows, macOS, Linux
+
+## 👨‍💻 开发指南
+
+### 📦 依赖管理策略
+
+项目采用分层依赖管理：
+
+- **requirements.txt** - 核心运行依赖（普通用户必需）
+- **requirements_browser.txt** - 浏览器功能依赖（可选）
+- **requirements-dev.txt** - 开发工具依赖（仅开发者需要）
+
+### 🛠️ 开发工具链
+
+本项目使用专业的代码质量工具：
+
+```bash
+# 代码格式化
+black . --line-length 120        # 统一代码风格
+isort . --profile black          # 整理导入语句
+
+# 代码质量检查
+flake8 . --max-line-length=120   # 静态代码分析
+autoflake --remove-all-unused-imports --recursive .  # 清理未使用导入
+
+# 测试运行
+pytest                           # 单元测试
+python main.py                   # 功能测试
+```
+
+### 🎯 贡献指南
+
+1. **Fork 项目** 
+2. **安装开发依赖**: `pip install -r requirements-dev.txt`
+3. **代码修改后运行格式化**: `black . && isort .`
+4. **质量检查**: `flake8 .`
+5. **提交代码**
+6. **创建 Pull Request**
+
+我们维护**严格的代码质量标准**，所有PR都会通过自动化检查！

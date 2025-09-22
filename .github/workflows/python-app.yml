@@ -51,18 +51,18 @@ jobs:
     - name: Strict code quality check
       run: |
         # 严格的代码质量检查 - 不容忍低质量代码
-        pip install black isort autoflake flake8
+        pip install -r requirements-dev.txt
         
         # 检查代码格式化状态
-        black --check --line-length=120 . || (echo "❌ 代码格式不规范，请运行 black . --line-length=120" && exit 1)
+        black --check --line-length=120 . || (echo "代码格式不规范，请运行 black . --line-length=120" && exit 1)
         
         # 检查导入排序
-        isort --check-only --profile black . || (echo "❌ 导入排序不规范，请运行 isort . --profile black" && exit 1)
+        isort --check-only --profile black . || (echo "导入排序不规范，请运行 isort . --profile black" && exit 1)
         
         # 严格的代码质量检查
         flake8 . --max-line-length=120 --ignore=F403,F405,W293,E203,W503,F824,E402 --count
         
-        echo "✅ 严格代码质量检查通过"
+        echo "严格代码质量检查通过"
     
     - name: Syntax validation
       run: |
@@ -75,38 +75,51 @@ jobs:
     - name: Core modules test
       env:
         QT_QPA_PLATFORM: offscreen
+        PYTHONIOENCODING: utf-8  # 修复Windows编码问题
       run: |
-        # 测试核心模块功能
+        # 测试核心模块功能（修复Windows编码）
         python -c "
         import sys, os
+        import locale
+        
+        # 设置UTF-8编码
+        if sys.platform == 'win32':
+            import codecs
+            sys.stdout = codecs.getwriter('utf-8')(sys.stdout.detach())
+            
         sys.path.insert(0, 'src')
         
         # 测试配置系统
         from config import Config
         config = Config.get_instance()
-        print('✅ 配置系统正常')
+        print('配置系统正常')
         
         # 测试管理器
         from utils.cursor_manager import CursorManager
-        print('✅ Cursor管理器正常')
+        print('Cursor管理器正常')
         
         # 测试版本检测
         from utils.cursor_version import CursorVersionDetector
-        print('✅ 版本检测器正常')
+        print('版本检测器正常')
         
-        print('🎉 所有核心功能测试通过')
+        print('所有核心功能测试通过')
         "
     
     - name: Browser features test (optional)
       continue-on-error: true
       env:
         QT_QPA_PLATFORM: offscreen
+        PYTHONIOENCODING: utf-8
       run: |
         python -c "
         import sys
+        if sys.platform == 'win32':
+            import codecs
+            sys.stdout = codecs.getwriter('utf-8')(sys.stdout.detach())
+            
         sys.path.insert(0, 'src')
         from utils.browser_manager import BrowserManager
-        print('✅ 浏览器管理器可选功能正常')
+        print('浏览器管理器可选功能正常')
         "
 
   build:
