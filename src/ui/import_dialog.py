@@ -4,9 +4,19 @@
 """
 
 
-from PyQt6.QtCore import *
-from PyQt6.QtGui import *
-from PyQt6.QtWidgets import *
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtWidgets import (
+    QDialog,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPlainTextEdit,
+    QPushButton,
+    QSplitter,
+    QVBoxLayout,
+)
 
 from ..utils.cookie_import_manager import CookieImportManager
 from ..utils.platform_utils import get_user_agent
@@ -23,6 +33,14 @@ class ImportDialog(QDialog):
         self.resize(1000, 650)
         self.account_data = None
         self.cookie_manager = CookieImportManager()
+
+        # 获取父窗口的主题管理器
+        if hasattr(parent, 'theme_manager'):
+            self.theme_manager = parent.theme_manager
+        else:
+            from .theme_manager import ThemeManager
+
+            self.theme_manager = ThemeManager()
 
         self.init_ui()
 
@@ -59,25 +77,13 @@ eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
         tip_label = QLabel(tip_text)
         tip_label.setWordWrap(True)
-        tip_label.setStyleSheet(
-            """
-            QLabel {
-                background-color: rgba(76, 175, 80, 0.1);
-                border-left: 4px solid #4CAF50;
-                padding: 12px;
-                margin: 8px 0;
-                border-radius: 4px;
-                font-size: 11px;
-                line-height: 1.4;
-            }
-        """
-        )
+        tip_label.setProperty("class", "tip-info")
         left_layout.addWidget(tip_label)
 
         # Cookie输入框
         self.cookie_input = QPlainTextEdit()
         self.cookie_input.setPlaceholderText(
-            "user_01XXXXX%3A%3AeyJhbGciOiJIUzI1NiXXXX...\n\n" "支持批量输入，每行一个账号token"
+            "user_01XXXXX%3A%3AeyJhbGciOiJIUzI1NiXXXX...\n\n" "为确保一号一码绑定，每次只能导入一个Cookie。"
         )
         left_layout.addWidget(self.cookie_input)
 
@@ -89,7 +95,8 @@ eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
         # 按钮区域
         button_layout = QHBoxLayout()
 
-        self.parse_btn = QPushButton("🔍 解析Cookie")
+        self.parse_btn = QPushButton("解析Cookie")
+        self.parse_btn.setProperty("class", "primary")
         self.parse_btn.clicked.connect(self.parse_cookie)
 
         button_layout.addWidget(self.parse_btn)
@@ -112,11 +119,13 @@ eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
         bottom_layout = QHBoxLayout()
         bottom_layout.addStretch()
 
-        self.import_btn = QPushButton("✅ 导入账号")
+        self.import_btn = QPushButton("导入账号")
+        self.import_btn.setProperty("class", "primary")
         self.import_btn.clicked.connect(self.add_account)
         self.import_btn.setEnabled(False)
 
-        cancel_btn = QPushButton("❌ 取消")
+        cancel_btn = QPushButton("取消")
+        cancel_btn.setProperty("class", "primary")
         cancel_btn.clicked.connect(self.reject)
 
         bottom_layout.addWidget(self.import_btn)
@@ -129,84 +138,14 @@ eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
         splitter.setStretchFactor(0, 0)  # 左侧固定宽度
         splitter.setStretchFactor(1, 1)  # 右侧自适应
 
-        # 应用精美样式
-        self.setStyleSheet(
-            """
-            QDialog {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #2e2e2e, stop:1 #1a1a1a);
-                color: #ffffff;
-                font-family: 'Segoe UI', sans-serif;
-            }
+        # 应用主题样式
+        self.apply_theme_style()
 
-            QGroupBox {
-                font-weight: bold;
-                font-size: 14px;
-                color: #ffffff;
-                border: 2px solid #404040;
-                border-radius: 10px;
-                margin-top: 20px;
-                padding-top: 20px;
-                background-color: rgba(45, 45, 45, 0.8);
-            }
-
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                subcontrol-position: top left;
-                padding: 5px 12px;
-                margin-left: 15px;
-                color: #ffffff;
-                background-color: #4CAF50;
-                border-radius: 4px;
-                font-weight: bold;
-                font-size: 13px;
-            }
-
-            QPlainTextEdit {
-                background-color: rgba(40, 40, 40, 0.9);
-                border: 2px solid #555;
-                border-radius: 8px;
-                padding: 10px;
-                font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-                font-size: 12px;
-                selection-background-color: #4CAF50;
-                color: #ffffff;
-            }
-
-            QLineEdit {
-                background-color: rgba(40, 40, 40, 0.9);
-                border: 2px solid #555;
-                border-radius: 6px;
-                padding: 8px;
-                font-size: 12px;
-                color: #ffffff;
-            }
-
-            QPushButton {
-                background-color: rgba(76, 175, 80, 0.8);
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                font-size: 12px;
-                font-weight: bold;
-                border-radius: 6px;
-                min-height: 20px;
-            }
-
-            QPushButton:hover {
-                background-color: rgba(76, 175, 80, 1.0);
-            }
-
-            QPushButton:pressed {
-                background-color: rgba(56, 142, 60, 1.0);
-            }
-
-            QPushButton:disabled {
-                background-color: rgba(100, 100, 100, 0.5);
-                color: rgba(255, 255, 255, 0.5);
-            }
-        """
-        )
+    def apply_theme_style(self):
+        """应用主题样式到对话框"""
+        if hasattr(self, 'theme_manager'):
+            qss = self.theme_manager.generate_qss()
+            self.setStyleSheet(qss)
 
     def parse_cookie(self):
         """解析Cookie"""
@@ -316,17 +255,7 @@ eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
                 formatted_text = self.cookie_manager.format_account_info(account_info)
 
                 self.result_display.setPlainText(formatted_text)
-                self.result_display.setStyleSheet(
-                    """
-                    QPlainTextEdit {
-                        color: #4CAF50;
-                        font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-                        background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                            stop:0 rgba(76, 175, 80, 0.1), stop:1 rgba(76, 175, 80, 0.05));
-                        border-color: #4CAF50;
-                    }
-                """
-                )
+                self.result_display.setProperty("class", "result-success")
                 self.import_btn.setEnabled(True)
                 print(
                     f"✅ 单账号API解析成功，邮箱: {account_info.get('email')}, 订阅: {account_info.get('subscription_type')}"
@@ -344,29 +273,12 @@ eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
     def _show_progress(self, message):
         """显示进度信息"""
         self.result_display.setPlainText(message)
-        self.result_display.setStyleSheet(
-            """
-            QPlainTextEdit {
-                color: #FFC107;
-                font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-            }
-        """
-        )
+        self.result_display.setProperty("class", "result-progress")
 
     def _show_error(self, message):
         """显示错误信息"""
         self.result_display.setPlainText(message)
-        self.result_display.setStyleSheet(
-            """
-            QPlainTextEdit {
-                color: #F44336;
-                font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 rgba(244, 67, 54, 0.1), stop:1 rgba(244, 67, 54, 0.05));
-                border-color: #F44336;
-            }
-        """
-        )
+        self.result_display.setProperty("class", "result-error")
         self.import_btn.setEnabled(False)
 
     def add_account(self):

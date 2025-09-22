@@ -8,9 +8,24 @@ import os
 import sys
 from datetime import datetime
 
-from PyQt6.QtCore import *
-from PyQt6.QtGui import *
-from PyQt6.QtWidgets import *
+from PyQt6.QtCore import QSize, Qt, QTimer
+from PyQt6.QtGui import QColor, QFont, QIcon
+from PyQt6.QtWidgets import (
+    QApplication,
+    QCheckBox,
+    QDialog,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QMainWindow,
+    QMessageBox,
+    QPushButton,
+    QStatusBar,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
 
 # 导入新的模块化组件
 from ..config import Config
@@ -19,6 +34,7 @@ from ..utils.cursor_manager import CursorManager
 from ..utils.cursor_process_manager import CursorProcessManager
 from ..utils.single_refresh_thread import SingleRefreshThread
 from ..utils.usage_update_thread import UsageUpdateThread
+from .theme_manager import ThemeManager
 
 
 class CursorAccountManagerPro(QMainWindow):
@@ -30,6 +46,10 @@ class CursorAccountManagerPro(QMainWindow):
         # 🔧 适配新架构：使用Config替代AccountDatabase
         self.config = Config.get_instance()
         self.cursor_manager = CursorManager(self.config)
+
+        # 🎨 初始化主题管理器
+        self.theme_manager = ThemeManager()
+        self.theme_manager.theme_changed.connect(self.on_theme_changed)
 
         # 线程管理
         self.apply_threads = {}  # 应用线程字典，按行号索引
@@ -43,11 +63,25 @@ class CursorAccountManagerPro(QMainWindow):
         self.cursor_installation_path = None
 
         self.setWindowTitle("Cursor Tool Free - 免费精简版")
-        self.setGeometry(100, 100, 900, 600)
+        self.setFixedSize(1000, 700)  # 设置固定窗口大小，不可拉伸
+
+        # 🎨 设置窗口图标
+
+        if os.path.exists("icon.png"):
+            self.setWindowIcon(QIcon("icon.png"))
 
         self.init_ui()
-        self.create_menu_bar()
+        # 移除菜单栏 - 功能整合到顶部header中
         self.load_accounts()
+
+        # 🎨 应用主题（在界面创建完成后）
+        # 🔤 加载内置字体
+        self.load_custom_fonts()
+
+        self.apply_default_theme()
+
+        # 🎨 更新主题按钮选中状态
+        self.update_theme_button_states(self.theme_manager.current_theme)
 
         # 每次启动都检查Cursor路径配置（严格模式，跨平台）
         QTimer.singleShot(1000, self.check_cursor_installation_paths)
@@ -64,17 +98,21 @@ class CursorAccountManagerPro(QMainWindow):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # 🔝 当前账号信息面板 - 用户要求放最上面
+        # 🎨 创建新的顶部标题区域 - 居中标题+右侧主题选择+设置
+        header = self.create_header_panel()
+        main_layout.addWidget(header)
+
+        # 🔝 当前账号信息面板
         current_account_panel = self.create_current_account_panel()
         main_layout.addWidget(current_account_panel)
 
-        # 🔧 账号列表工具栏 - 用户要求放在当前账号信息下面
+        # 🔧 账号列表工具栏
         toolbar = self.create_toolbar()
         main_layout.addWidget(toolbar)
 
-        # 主表格
-        self.create_account_table()
-        main_layout.addWidget(self.account_table)
+        # 🃏 主表格 - 包装在卡片容器中
+        table_container = self.create_table_container()
+        main_layout.addWidget(table_container)
 
         # 底部按钮栏
         bottom_bar = self.create_bottom_bar()
@@ -86,13 +124,41 @@ class CursorAccountManagerPro(QMainWindow):
         self.status_bar.showMessage("就绪")
 
         # 应用样式
-        self.setStyleSheet(self.get_professional_style())
+        # 移除硬编码样式，使用主题系统
+
+    def create_header_panel(self):
+        """创建顶部标题区域 - 居中标题+右侧主题选择+设置"""
+        header = QWidget()
+        header.setFixedHeight(120)
+        header.setProperty("class", "header")
+
+        layout = QHBoxLayout(header)
+        layout.setContentsMargins(15, 10, 15, 10)
+        layout.setSpacing(20)
+
+        # 🏷️ 居中标题 - 现在右侧没有内容了，可以真正居中
+        title_label = QLabel("Cursor账号管理工具")
+        title_label.setProperty("class", "header-title")
+        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # 使用字体管理器获取最佳字体
+        try:
+            from ..utils.font_manager import font_manager
+
+            primary_font = font_manager.get_primary_font_family()
+        except Exception:
+            primary_font = "HarmonyOS Sans SC"
+        title_label.setFont(QFont(primary_font, 48, QFont.Weight.Bold))
+        layout.addWidget(title_label, 1)  # 占用所有空间并居中
+
+        # 标题区域现在只显示标题，不包含按钮
+
+        return header
 
     def create_toolbar(self):
         """创建工具栏"""
         toolbar = QWidget()
         toolbar.setFixedHeight(60)
-        toolbar.setStyleSheet("background-color: #1e1e1e; border-bottom: 1px solid #3c3c3c;")
+        # 使用主题颜色
 
         layout = QHBoxLayout(toolbar)
         layout.setContentsMargins(15, 10, 15, 10)
@@ -100,46 +166,23 @@ class CursorAccountManagerPro(QMainWindow):
         # 标题
         title_label = QLabel("账号列表")
         title_label.setFont(QFont("", 14, QFont.Weight.Bold))
-        title_label.setStyleSheet("color: white;")
+        title_label.setProperty("class", "title")
         layout.addWidget(title_label)
 
-        # 导入按钮
-        import_btn = QPushButton("📥 导入账号")
-        import_btn.clicked.connect(self.show_import_dialog)
-        import_btn.setStyleSheet(
-            """
-            QPushButton {
-                background-color: transparent;
-                color: #5294e2;
-                border: none;
-                font-size: 14px;
-                padding: 5px 10px;
-            }
-            QPushButton:hover {
-                color: #5c9eec;
-                background-color: rgba(82, 148, 226, 0.1);
-            }
-        """
-        )
-        layout.addWidget(import_btn)
-
-        # 全选Pro
-        self.select_pro_cb = QCheckBox("🎯 全选Pro")
+        # 全选Pro - 提前到导入按钮前面
+        self.select_pro_cb = QCheckBox("全选Pro")
         self.select_pro_cb.setToolTip("勾选所有pro专业版状态的账号")
-        self.select_pro_cb.setStyleSheet(
-            """
-            QCheckBox {
-                color: #4caf50;
-                font-size: 14px;
-                padding: 5px;
-            }
-            QCheckBox:hover {
-                color: #66bb6a;
-            }
-        """
-        )
         self.select_pro_cb.stateChanged.connect(self.select_all_pro)
         layout.addWidget(self.select_pro_cb)
+
+        # 增加间距
+        layout.addSpacing(15)
+
+        # 导入按钮 - 使用主题色
+        import_btn = QPushButton("导入账号")
+        import_btn.clicked.connect(self.show_import_dialog)
+        import_btn.setProperty("class", "primary")
+        layout.addWidget(import_btn)
 
         layout.addStretch()
 
@@ -147,149 +190,165 @@ class CursorAccountManagerPro(QMainWindow):
 
         # 统计信息
         self.stats_label = QLabel("已应用: 0 | 待应用: 0")
-        self.stats_label.setStyleSheet("color: #cccccc;")
         layout.addWidget(self.stats_label)
 
         return toolbar
 
+    def create_table_container(self):
+        """创建表格容器 - 实现卡片效果和边距"""
+        container = QWidget()
+        container.setProperty("class", "table-container")
+
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(15, 20, 15, 20)  # 恢复15px左右边距适应970px表格
+        layout.setSpacing(0)
+
+        # 创建表格
+        self.create_account_table()
+
+        # 表格包装器 - 实现圆角卡片效果
+        table_wrapper = QWidget()
+        table_wrapper.setProperty("class", "table-card")
+        table_wrapper.setFixedWidth(970)  # 与表格宽度一致
+        table_wrapper.setFixedHeight(300)  # 与表格高度一致
+        wrapper_layout = QVBoxLayout(table_wrapper)
+        wrapper_layout.setContentsMargins(0, 0, 0, 0)
+        wrapper_layout.setSpacing(0)
+        wrapper_layout.addWidget(self.account_table)
+
+        # 居中显示固定宽度的表格
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(table_wrapper)
+
+        return container
+
     def create_current_account_panel(self):
         """创建当前账号信息面板的顶部信息显示"""
         panel = QWidget()
-        panel.setFixedHeight(80)
-        panel.setStyleSheet(
-            """
-            QWidget {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #2e2e2e, stop:1 #1e1e1e);
-                border-bottom: 1px solid #3c3c3c;
-            }
-        """
-        )
+        panel.setFixedHeight(90)
+        panel.setProperty("class", "account-panel")
 
         layout = QHBoxLayout(panel)
-        layout.setContentsMargins(20, 10, 20, 10)
-        layout.setSpacing(20)
+        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(25)
 
-        # 左侧：当前账号信息
-        account_info_container = QWidget()
-        account_info_layout = QVBoxLayout(account_info_container)
-        account_info_layout.setContentsMargins(0, 0, 0, 0)
-        account_info_layout.setSpacing(2)
+        # 左侧：当前账号信息卡片
+        account_card = QWidget()
+        account_card.setProperty("class", "account-info-card")
+        account_layout = QVBoxLayout(account_card)
+        account_layout.setContentsMargins(15, 8, 15, 8)
+        account_layout.setSpacing(4)
 
-        # 当前邮箱标签 - 和原项目完全一样的样式
+        # 当前邮箱标签
         self.current_email_label = QLabel("当前账号: 检测中...")
-        self.current_email_label.setFont(QFont("", 12, QFont.Weight.Bold))
-        self.current_email_label.setStyleSheet("color: white;")
+        self.current_email_label.setFont(QFont("", 10, QFont.Weight.Bold))
+        self.current_email_label.setProperty("class", "account-email")
 
         # 订阅信息标签
         self.current_subscription_label = QLabel("订阅类型: 查询中...")
-        self.current_subscription_label.setFont(QFont("", 10))
-        self.current_subscription_label.setStyleSheet("color: #cccccc;")
+        self.current_subscription_label.setFont(QFont("", 10, QFont.Weight.Bold))
+        self.current_subscription_label.setProperty("class", "account-subscription")
 
-        account_info_layout.addWidget(self.current_email_label)
-        account_info_layout.addWidget(self.current_subscription_label)
+        account_layout.addWidget(self.current_email_label)
+        account_layout.addWidget(self.current_subscription_label)
 
-        # 右侧：使用额度和操作按钮
-        right_container = QWidget()
-        right_layout = QHBoxLayout(right_container)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(15)
+        # 中间：使用额度卡片
+        usage_card = QWidget()
+        usage_card.setProperty("class", "usage-info-card")
+        usage_layout = QVBoxLayout(usage_card)
+        usage_layout.setContentsMargins(15, 8, 15, 8)
+        usage_layout.setSpacing(0)
+        usage_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         # 使用额度标签(a+b=c$)格式
         self.current_usage_label = QLabel("使用额度: 计算中...")
-        self.current_usage_label.setFont(QFont("", 11, QFont.Weight.Bold))
-        self.current_usage_label.setStyleSheet("color: #00FF00;")  # 默认绿色
+        self.current_usage_label.setFont(QFont("", 12, QFont.Weight.Bold))
+        self.current_usage_label.setProperty("class", "usage-amount")
+        self.current_usage_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        usage_layout.addWidget(self.current_usage_label)
 
-        # 刷新按钮 - 🔄 刷新当前登录账号信息
-        self.refresh_account_button = QPushButton("🔄")
+        # 右侧：操作按钮组
+        actions_container = QWidget()
+        actions_layout = QHBoxLayout(actions_container)
+        actions_layout.setContentsMargins(0, 0, 0, 0)
+        actions_layout.setSpacing(6)
+
+        # 创建PNG图标按钮 - 统一大小为24×24
+        try:
+            from ..utils.icon_painter import IconPainter
+
+            use_png_icons = True
+        except Exception as e:
+            print(f"⚠️ 图标加载器失败: {e}")
+            use_png_icons = False
+
+        # 刷新按钮
+        self.refresh_account_button = QPushButton()
         self.refresh_account_button.setToolTip("刷新当前登录账号使用额度")
-        self.refresh_account_button.setFixedSize(32, 32)
-        self.refresh_account_button.setStyleSheet(
-            """
-            QPushButton {
-                background-color: rgba(255, 152, 0, 0.2);
-                color: #FF9800;
-                border: none;
-                font-size: 14px;
-                border-radius: 16px;
-                font-weight: bold;
-            }
-            QPushButton:hover:!disabled {
-                background-color: rgba(255, 152, 0, 0.3);
-                color: #FFB74D;
-            }
-            QPushButton:pressed:!disabled {
-                background-color: rgba(255, 152, 0, 0.4);
-                color: #F57C00;
-            }
-            QPushButton:disabled {
-                background-color: rgba(128, 128, 128, 0.1);
-                color: rgba(128, 128, 128, 0.4);
-                border: 1px solid rgba(128, 128, 128, 0.2);
-            }
-        """
-        )
+        self.refresh_account_button.setFixedSize(40, 40)
+        self.refresh_account_button.setProperty("class", "icon-button-warning")
+
+        if use_png_icons:
+            refresh_icon = IconPainter.create_refresh_icon(24, "#ffffff")
+            if refresh_icon:
+                self.refresh_account_button.setIcon(refresh_icon)
+                self.refresh_account_button.setIconSize(QSize(24, 24))
+            else:
+                self.refresh_account_button.setText("↻")
+                self.refresh_account_button.setFont(QFont("", 22))
+        else:
+            self.refresh_account_button.setText("↻")
+            self.refresh_account_button.setFont(QFont("", 22))
+
         self.refresh_account_button.clicked.connect(self.update_usage_data)
 
-        # Dashboard登录按钮 - 🌐 浏览器登录到Dashboard
-        dashboard_button = QPushButton("🌐")
+        # Dashboard按钮
+        dashboard_button = QPushButton()
         dashboard_button.setToolTip("浏览器登录到Dashboard")
-        dashboard_button.setFixedSize(32, 32)
-        dashboard_button.setStyleSheet(
-            """
-            QPushButton {
-                background-color: rgba(76, 175, 80, 0.2);
-                color: #4CAF50;
-                border: none;
-                font-size: 14px;
-                border-radius: 16px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: rgba(76, 175, 80, 0.3);
-                color: #66BB6A;
-            }
-            QPushButton:pressed {
-                background-color: rgba(76, 175, 80, 0.4);
-                color: #45a049;
-            }
-        """
-        )
+        dashboard_button.setFixedSize(40, 40)
+        dashboard_button.setProperty("class", "icon-button-info")
+
+        if use_png_icons:
+            globe_icon = IconPainter.create_globe_icon(24, "#ffffff")
+            if globe_icon:
+                dashboard_button.setIcon(globe_icon)
+                dashboard_button.setIconSize(QSize(24, 24))
+            else:
+                dashboard_button.setText("○")
+                dashboard_button.setFont(QFont("", 20))
+        else:
+            dashboard_button.setText("○")
+            dashboard_button.setFont(QFont("", 20))
+
         dashboard_button.clicked.connect(self.login_to_dashboard)
 
-        # 添加当前账号按钮 - ➕ 添加当前账号到账号管理列表
-        add_current_button = QPushButton("➕")
+        # 添加按钮
+        add_current_button = QPushButton()
         add_current_button.setToolTip("添加当前账号到账号管理列表")
-        add_current_button.setFixedSize(32, 32)
-        add_current_button.setStyleSheet(
-            """
-            QPushButton {
-                background-color: rgba(33, 150, 243, 0.2);
-                color: #2196F3;
-                border: none;
-                font-size: 14px;
-                border-radius: 16px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: rgba(33, 150, 243, 0.3);
-                color: #42A5F5;
-            }
-            QPushButton:pressed {
-                background-color: rgba(33, 150, 243, 0.4);
-                color: #1976D2;
-            }
-        """
-        )
+        add_current_button.setFixedSize(40, 40)
+        add_current_button.setProperty("class", "icon-button-success")
+
+        if use_png_icons:
+            plus_icon = IconPainter.create_plus_icon(24, "#ffffff")
+            if plus_icon:
+                add_current_button.setIcon(plus_icon)
+                add_current_button.setIconSize(QSize(24, 24))
+            else:
+                add_current_button.setText("+")
+                add_current_button.setFont(QFont("", 24, QFont.Weight.Bold))
+        else:
+            add_current_button.setText("+")
+            add_current_button.setFont(QFont("", 24, QFont.Weight.Bold))
+
         add_current_button.clicked.connect(self.add_current_account_to_list)
 
-        right_layout.addWidget(self.current_usage_label)
-        right_layout.addWidget(self.refresh_account_button)
-        right_layout.addWidget(dashboard_button)
-        right_layout.addWidget(add_current_button)
+        actions_layout.addWidget(self.refresh_account_button)
+        actions_layout.addWidget(dashboard_button)
+        actions_layout.addWidget(add_current_button)
 
-        layout.addWidget(account_info_container, 1)  # 左侧占用更多空间
-        layout.addWidget(right_container, 0)  # 右侧按钮紧凑
+        layout.addWidget(account_card, 2)  # 账号信息占更多空间，避免截断
+        layout.addWidget(usage_card, 1)  # 使用额度适中显示
+        layout.addWidget(actions_container, 0)  # 操作按钮紧凑
 
         return panel
 
@@ -305,58 +364,145 @@ class CursorAccountManagerPro(QMainWindow):
         self.account_table.setAlternatingRowColors(True)
         self.account_table.verticalHeader().setVisible(False)
 
-        # 设置行高
-        self.account_table.verticalHeader().setDefaultSectionSize(45)
+        # 禁止所有滚动条显示，但保持滚动功能
+        self.account_table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.account_table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.account_table.horizontalHeader().setStretchLastSection(False)
 
-        # 设置列宽
+        # 设置编辑权限 - 只允许备注列编辑
+        self.account_table.setEditTriggers(
+            QTableWidget.EditTrigger.DoubleClicked | QTableWidget.EditTrigger.EditKeyPressed
+        )
+
+        # 表头不可编辑
+        self.account_table.horizontalHeader().setSectionsClickable(True)  # 可点击但不可编辑
+        self.account_table.horizontalHeader().setSectionsMovable(False)  # 不可移动
+
+        # 设置表格固定高度和行高
+        table_height = 300  # 表格高度
+        row_height = 50  # 行高
+
+        self.account_table.setFixedHeight(table_height)
+        self.account_table.verticalHeader().setDefaultSectionSize(row_height)
+
+        # 设置列宽 - 重新平衡各列宽度
         header = self.account_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)  # 选择
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)  # 邮箱
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)  # 邮箱
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)  # 订阅类型
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)  # 备注
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)  # 备注 - 改为固定宽度
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)  # 状态
         header.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)  # 操作
         header.setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)  # 详情
 
-        self.account_table.setColumnWidth(0, 50)
-        self.account_table.setColumnWidth(2, 100)
-        self.account_table.setColumnWidth(3, 120)  # 备注列增加一倍宽度：60 -> 120
-        self.account_table.setColumnWidth(4, 80)
-        self.account_table.setColumnWidth(5, 100)
-        self.account_table.setColumnWidth(6, 40)
+        self.account_table.setColumnWidth(0, 50)  # 选择
+        self.account_table.setColumnWidth(1, 340)  # 邮箱 - 增加到340px
+        self.account_table.setColumnWidth(2, 100)  # 订阅类型
+        self.account_table.setColumnWidth(3, 250)  # 备注 - 调整为250px
+        self.account_table.setColumnWidth(4, 80)  # 状态
+        self.account_table.setColumnWidth(5, 100)  # 操作
+        self.account_table.setColumnWidth(6, 50)  # 详情 - 增加到50px
 
-        # 连接表格点击事件 - 订阅类型点击刷新功能
+        # 设置表格固定宽度 - 增加宽度，为滚动条预留外部空间
+        columns_width = 50 + 340 + 100 + 250 + 80 + 100 + 50  # 列宽总和970px (备注减10px)
+        self.account_table.setFixedWidth(columns_width)
+
+        # 更新列宽 - 备注列减少10px
+        self.account_table.setColumnWidth(1, 340)  # 邮箱 - 340px
+        self.account_table.setColumnWidth(3, 250)  # 备注 - 减少到250px
+        self.account_table.setColumnWidth(6, 50)  # 详情 - 50px
+
+        # 禁止用户手动调整列宽
+        header.setStretchLastSection(False)
+
+        # 连接表格事件
         self.account_table.cellClicked.connect(self.on_table_cell_clicked)
+        self.account_table.itemChanged.connect(self.on_item_changed)  # 监听内容变化
 
     def create_bottom_bar(self):
         """创建底部按钮栏"""
         bottom_bar = QWidget()
         bottom_bar.setFixedHeight(80)
-        bottom_bar.setStyleSheet("background-color: #2b2b2b; border-top: 1px solid #3c3c3c;")
 
         layout = QHBoxLayout(bottom_bar)
-        layout.setContentsMargins(20, 15, 20, 15)
+        layout.setContentsMargins(15, 15, 15, 15)
 
-        # 三个主要按钮
+        # 三个主要按钮 - 统一使用主要主题色，由QSS控制尺寸
         copy_btn = QPushButton("复制选中")
-        copy_btn.setMinimumSize(120, 50)
-        copy_btn.setStyleSheet(self.get_button_style("#28a745", "#218838"))
+        copy_btn.setProperty("class", "primary")
         copy_btn.clicked.connect(self.copy_selected)
         layout.addWidget(copy_btn)
 
         delete_btn = QPushButton("删除选中")
-        delete_btn.setMinimumSize(120, 50)
-        delete_btn.setStyleSheet(self.get_button_style("#dc3545", "#c82333"))
+        delete_btn.setProperty("class", "primary")  # 改为主要主题色
         delete_btn.clicked.connect(self.delete_selected)
         layout.addWidget(delete_btn)
 
         clear_btn = QPushButton("清除已应用")
-        clear_btn.setMinimumSize(120, 50)
-        clear_btn.setStyleSheet(self.get_button_style("#dc3545", "#c82333"))
+        clear_btn.setProperty("class", "primary")  # 改为主要主题色
         clear_btn.clicked.connect(self.clear_applied)
         layout.addWidget(clear_btn)
 
         layout.addStretch()
+
+        # 🎨 右侧主题选择和设置按钮
+        right_container = QWidget()
+        right_layout = QHBoxLayout(right_container)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(4)
+        right_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)  # 垂直居中对齐
+
+        # 主题选择按钮组
+        if not hasattr(self, 'theme_buttons'):
+            self.theme_buttons = {}
+
+        themes_data = [
+            ("default", "#1c1f23", "现代简约"),
+            ("theme-1", "#ff9ab7", "温柔粉色"),
+            ("theme-2", "#00bcd4", "青绿科技"),
+            ("theme-5", "#93bff5", "多彩柔和"),
+        ]
+
+        for theme_id, color, name in themes_data:
+            btn = QPushButton()
+            btn.setFixedSize(18, 18)  # 更紧凑的正方形
+            btn.setProperty("theme_id", theme_id)
+            btn.setProperty("class", "theme-color-button")
+            btn.setToolTip(f"🎨 {name}")
+            btn.setStyleSheet(
+                f"""
+                QPushButton {{
+                    background-color: {color};
+                    border: none;
+                    border-radius: 4px;
+                    min-width: 18px;
+                    max-width: 18px;
+                    min-height: 18px;
+                    max-height: 18px;
+                    padding: 0px;
+                    margin: 0px;
+                }}
+                QPushButton:hover {{
+                    background-color: {color};
+                }}
+                QPushButton:checked {{
+                    background-color: {color};
+                }}
+            """
+            )
+            btn.setCheckable(True)
+            btn.clicked.connect(lambda checked, tid=theme_id: self.switch_theme(tid))
+            right_layout.addWidget(btn)
+            self.theme_buttons[theme_id] = btn
+
+        # 设置按钮 - 使用主要主题色，由QSS控制尺寸
+        cursor_path_btn = QPushButton("设置Cursor路径")
+        cursor_path_btn.setProperty("class", "primary")  # 改为主要主题色
+        cursor_path_btn.setToolTip("修改Cursor安装路径")
+        cursor_path_btn.clicked.connect(self.manual_set_cursor_path)
+        right_layout.addWidget(cursor_path_btn)
+
+        layout.addWidget(right_container)
 
         return bottom_bar
 
@@ -405,30 +551,38 @@ class CursorAccountManagerPro(QMainWindow):
             checkbox_layout.addWidget(checkbox)
             self.account_table.setCellWidget(row, 0, checkbox_widget)
 
-            # 邮箱
+            # 邮箱 - 不可编辑
             email = account.get("email", "N/A")
             email_item = QTableWidgetItem(email)
             email_item.setToolTip(email)
+            email_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)  # 设置邮箱居中对齐
+            email_item.setFlags(email_item.flags() & ~Qt.ItemFlag.ItemIsEditable)  # 设置为不可编辑
             self.account_table.setItem(row, 1, email_item)
 
-            # 订阅类型
+            # 订阅类型 - 不可编辑
             subscription_type = account.get("subscription_type", "未知")
             subscription_item = QTableWidgetItem(subscription_type)
+            subscription_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)  # 订阅类型居中
+            subscription_item.setFlags(subscription_item.flags() & ~Qt.ItemFlag.ItemIsEditable)  # 设置为不可编辑
 
             # 🎨 设置订阅类型颜色
             subscription_color = self.get_subscription_color(subscription_type)
             subscription_item.setForeground(subscription_color)
             self.account_table.setItem(row, 2, subscription_item)
 
-            # 备注
+            # 备注 - 可编辑
             note = account.get("note", "")
             note_item = QTableWidgetItem(note)
             note_item.setToolTip(note)
+            note_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)  # 备注居中对齐
+            # 备注列保持可编辑（默认就是可编辑的）
             self.account_table.setItem(row, 3, note_item)
 
-            # 状态
+            # 状态 - 不可编辑
             status = account.get("status", "待应用")
             status_item = QTableWidgetItem(status)
+            status_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)  # 状态居中
+            status_item.setFlags(status_item.flags() & ~Qt.ItemFlag.ItemIsEditable)  # 设置为不可编辑
 
             # 🎨 设置状态颜色 - 支持完整状态
             if status == "已应用":
@@ -445,26 +599,55 @@ class CursorAccountManagerPro(QMainWindow):
             # 🔧 动态操作按钮
             self._update_action_button_for_row(row, account)
 
-            # 详情按钮
-            detail_btn = QPushButton("详情")
-            detail_btn.setStyleSheet(
-                """
-                QPushButton {
-                    background-color: #17a2b8;
-                    color: white;
-                    border: none;
-                    padding: 6px 12px;
-                    border-radius: 4px;
-                    font-weight: bold;
-                    font-size: 11px;
-                }
-                QPushButton:hover {
-                    background-color: #138496;
-                }
-            """
-            )
+            # 详情按钮 - 复用地球图标按钮样式，确保居中
+            detail_btn = QPushButton()
+            detail_btn.setToolTip("浏览器登录到Dashboard")
+            detail_btn.setFixedSize(35, 35)  # 适应45px列宽，留边距
+            detail_btn.setProperty("class", "icon-button-info")  # 使用地球按钮样式
+
+            # 复用地球图标逻辑，确保图标居中
+            try:
+                from ..utils.icon_painter import IconPainter
+
+                globe_icon = IconPainter.create_globe_icon(20, "#ffffff")  # 适应35px按钮
+                if globe_icon:
+                    detail_btn.setIcon(globe_icon)
+                    detail_btn.setIconSize(QSize(20, 20))
+                else:
+                    detail_btn.setText("○")
+                    detail_btn.setFont(QFont("", 16))  # 适应35px按钮
+            except Exception:
+                detail_btn.setText("○")
+                detail_btn.setFont(QFont("", 16))  # 适应35px按钮
+
             detail_btn.clicked.connect(lambda checked, r=row: self.auto_login_browser(r))
-            self.account_table.setCellWidget(row, 6, detail_btn)
+
+            # 将按钮放在容器中居中显示
+            detail_container = QWidget()
+            detail_layout = QHBoxLayout(detail_container)
+            detail_layout.setContentsMargins(0, 0, 0, 0)
+            detail_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            detail_layout.addWidget(detail_btn)
+
+            self.account_table.setCellWidget(row, 6, detail_container)
+
+    # ================= 事件处理方法 =================
+
+    def on_item_changed(self, item):
+        """表格项内容变化事件 - 只处理备注列的编辑"""
+        row = item.row()
+        column = item.column()
+
+        # 只处理备注列（第3列）的编辑
+        if column == 3:
+            new_note = item.text()
+            accounts = self.config.get_accounts()
+
+            if row < len(accounts):
+                accounts[row]["note"] = new_note
+                self.config.config["accounts"] = accounts
+                self.config._save_config(self.config.config)
+                self.status_bar.showMessage(f"✅ 备注已保存: {new_note[:20]}...")
 
     # ================= 样式方法  =================
 
@@ -483,85 +666,16 @@ class CursorAccountManagerPro(QMainWindow):
         return color_map.get(subscription_type, QColor(255, 255, 255))
 
     def get_button_style(self, bg_color, hover_color):
-        """获取按钮样式"""
-        return f"""
-        QPushButton {{
-            background-color: {bg_color};
-            color: white;
-            font-weight: bold;
-            border: none;
-            border-radius: 6px;
-            font-size: 12px;
-        }}
-        QPushButton:hover {{
-            background-color: {hover_color};
-        }}
-        """
+        """获取按钮样式 - 已迁移到主题系统"""
+        return ""
 
     def get_apply_button_style(self):
-        """应用按钮样式"""
-        return """
-        QPushButton {
-            background-color: #28a745;
-            color: white;
-            border: none;
-            padding: 6px 12px;
-            border-radius: 4px;
-            font-weight: bold;
-            font-size: 11px;
-        }
-        QPushButton:hover {
-            background-color: #218838;
-        }
-        """
+        """应用按钮样式 - 已迁移到主题系统"""
+        return ""
 
     def get_professional_style(self):
-        """专业样式"""
-        return """
-        QMainWindow {
-            background-color: #2b2b2b;
-            color: #ffffff;
-        }
-
-        QTableWidget {
-            background-color: #2b2b2b;
-            gridline-color: #404040;
-            selection-background-color: #0078d4;
-            border: none;
-        }
-
-        QTableWidget::item {
-            padding: 8px;
-            border-bottom: 1px solid #404040;
-        }
-
-        QHeaderView::section {
-            background-color: #1e1e1e;
-            color: #ffffff;
-            padding: 12px 8px;
-            border: none;
-            border-right: 1px solid #404040;
-            border-bottom: 1px solid #404040;
-            font-weight: bold;
-        }
-
-        QCheckBox {
-            color: #ffffff;
-        }
-
-        QCheckBox::indicator {
-            width: 16px;
-            height: 16px;
-            border: 2px solid #404040;
-            border-radius: 3px;
-            background-color: #2b2b2b;
-        }
-
-        QCheckBox::indicator:checked {
-            background-color: #0078d4;
-            border-color: #0078d4;
-        }
-        """
+        """专业样式 - 已迁移到主题系统"""
+        return ""
 
     # ================= 功能方法 - 适配新架构 =================
 
@@ -616,19 +730,7 @@ class CursorAccountManagerPro(QMainWindow):
             # 🔧 更新操作按钮为"应用中"状态
             apply_btn = QPushButton("应用中")
             apply_btn.setEnabled(False)  # 禁用按钮
-            apply_btn.setStyleSheet(
-                """
-                QPushButton {
-                    background-color: #ffc107;
-                    color: #000;
-                    border: none;
-                    padding: 6px 12px;
-                    border-radius: 4px;
-                    font-weight: bold;
-                    font-size: 11px;
-                }
-            """
-            )
+            apply_btn.setProperty("class", "warning")
             self.account_table.setCellWidget(row, 5, apply_btn)
 
             # 🔧 2. 重要：从token中提取真实邮箱地址 - 统一字段
@@ -1024,75 +1126,45 @@ class CursorAccountManagerPro(QMainWindow):
         if subscription_type == "废卡":
             # 废卡显示删除按钮
             delete_btn = QPushButton("删除")
-            delete_btn.setStyleSheet(
-                """
-                QPushButton {
-                    background-color: #dc3545;
-                    color: white;
-                    border: none;
-                    padding: 6px 12px;
-                    border-radius: 4px;
-                    font-weight: bold;
-                    font-size: 11px;
-                }
-                QPushButton:hover {
-                    background-color: #e04b59;
-                }
-                QPushButton:pressed {
-                    background-color: #bd2130;
-                }
-            """
-            )
+            delete_btn.setFixedSize(80, 35)  # 设置固定尺寸，避免被行高撑大
+            delete_btn.setProperty("class", "primary")  # 统一使用主要主题色
             delete_btn.clicked.connect(lambda checked, r=row: self.delete_single_account(r))
-            self.account_table.setCellWidget(row, 5, delete_btn)
-        elif status == "应用中":
-            # 🔧 当前活跃账号显示"再应用"按钮
+
+            # 将按钮放在容器中居中显示
+            btn_container = QWidget()
+            btn_layout = QHBoxLayout(btn_container)
+            btn_layout.setContentsMargins(0, 0, 0, 0)
+            btn_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            btn_layout.addWidget(delete_btn)
+            self.account_table.setCellWidget(row, 5, btn_container)
+        elif status in ["应用中", "已应用"]:
+            # 当前使用账号或已使用账号显示"再应用"按钮
             reapply_btn = QPushButton("再应用")
-            reapply_btn.setStyleSheet(
-                """
-                QPushButton {
-                    background-color: #ff9800;
-                    color: white;
-                    border: none;
-                    padding: 6px 12px;
-                    border-radius: 4px;
-                    font-weight: bold;
-                    font-size: 11px;
-                }
-                QPushButton:hover {
-                    background-color: #e68900;
-                }
-            """
-            )
+            reapply_btn.setFixedSize(80, 35)  # 设置固定尺寸，避免被行高撑大
+            reapply_btn.setProperty("class", "primary")  # 统一主要主题色
             reapply_btn.clicked.connect(lambda checked, r=row: self.apply_account_async(r))
-            self.account_table.setCellWidget(row, 5, reapply_btn)
-        elif status == "已应用":
-            # 🔧 之前应用过的账号显示"切换"按钮
-            switch_btn = QPushButton("切换")
-            switch_btn.setStyleSheet(
-                """
-                QPushButton {
-                    background-color: #4caf50;
-                    color: white;
-                    border: none;
-                    padding: 6px 12px;
-                    border-radius: 4px;
-                    font-weight: bold;
-                    font-size: 11px;
-                }
-                QPushButton:hover {
-                    background-color: #45a049;
-                }
-            """
-            )
-            switch_btn.clicked.connect(lambda checked, r=row: self.apply_account_async(r))
-            self.account_table.setCellWidget(row, 5, switch_btn)
+
+            # 将按钮放在容器中居中显示
+            btn_container = QWidget()
+            btn_layout = QHBoxLayout(btn_container)
+            btn_layout.setContentsMargins(0, 0, 0, 0)
+            btn_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            btn_layout.addWidget(reapply_btn)
+            self.account_table.setCellWidget(row, 5, btn_container)
         else:
-            # 待应用状态显示"应用账号"按钮
-            apply_btn = QPushButton("应用账号")
-            apply_btn.setStyleSheet(self.get_apply_button_style())
+            # 首次使用账号显示"应用"按钮
+            apply_btn = QPushButton("应用")
+            apply_btn.setFixedSize(80, 35)  # 设置固定尺寸，避免被行高撑大
+            apply_btn.setProperty("class", "primary")  # 统一主要主题色
             apply_btn.clicked.connect(lambda checked, r=row: self.apply_account_async(r))
-            self.account_table.setCellWidget(row, 5, apply_btn)
+
+            # 将按钮放在容器中居中显示
+            btn_container = QWidget()
+            btn_layout = QHBoxLayout(btn_container)
+            btn_layout.setContentsMargins(0, 0, 0, 0)
+            btn_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            btn_layout.addWidget(apply_btn)
+            self.account_table.setCellWidget(row, 5, btn_container)
 
     def delete_single_account(self, row):
         """删除单个账号 -"""
@@ -1839,6 +1911,22 @@ class CursorAccountManagerPro(QMainWindow):
         view_path_action = settings_menu.addAction("查看当前路径")
         view_path_action.triggered.connect(self.view_current_cursor_path)
 
+        # 外观菜单
+        settings_menu.addSeparator()
+        theme_menu = settings_menu.addMenu("🎨 外观")
+
+        # 添加主题选项
+        themes = self.theme_manager.get_theme_list()
+        for theme_id, name, description in themes:
+            action = theme_menu.addAction(f"{name}")
+            action.triggered.connect(lambda checked, tid=theme_id: self.switch_theme(tid))
+
+        # 深色模式切换
+        theme_menu.addSeparator()
+        dark_mode_action = theme_menu.addAction("🌙 深色模式")
+        dark_mode_action.setCheckable(True)
+        dark_mode_action.toggled.connect(self.toggle_dark_mode)
+
     def manual_set_cursor_path(self):
         """手动设置Cursor路径（菜单调用 - 严格模式）"""
         from PyQt6.QtWidgets import QMessageBox
@@ -1872,6 +1960,62 @@ class CursorAccountManagerPro(QMainWindow):
             QMessageBox.information(
                 self, "当前Cursor路径", "尚未设置Cursor安装路径。\n\n程序将尝试在默认位置查找Cursor。"
             )
+
+    def load_custom_fonts(self):
+        """加载自定义字体"""
+        try:
+            from ..utils.font_manager import font_manager
+
+            font_manager.load_all_fonts()
+
+            # 获取主字体并更新标题字体
+            primary_font = font_manager.get_primary_font_family()
+            print(f"🔤 主字体设置为: {primary_font}")
+
+        except Exception as e:
+            print(f"⚠️ 字体加载失败: {e}")
+
+    def apply_default_theme(self):
+        """应用默认主题"""
+        # 从配置中读取保存的主题
+        saved_theme = self.config.get('app', 'theme') or 'default'
+        dark_mode = self.config.get('app', 'dark_mode') or False
+
+        self.theme_manager.set_theme(saved_theme, dark_mode)
+        self.theme_manager.apply_theme()
+        print(f"✅ 已应用主题: {saved_theme}")
+
+    def switch_theme(self, theme_id):
+        """切换主题"""
+        success = self.theme_manager.set_theme(theme_id, self.theme_manager.is_dark_mode)
+        if success:
+            # 保存主题设置
+            self.config.set('app', 'theme', theme_id)
+            # 更新主题按钮选中状态
+            self.update_theme_button_states(theme_id)
+            self.theme_manager.apply_theme()
+            theme_name = self.theme_manager.themes[theme_id]['name']
+            self.status_bar.showMessage(f"✅ 已切换到 {theme_name} 主题")
+
+    def update_theme_button_states(self, current_theme_id):
+        """更新主题按钮选中状态"""
+        if hasattr(self, 'theme_buttons'):
+            for theme_id, btn in self.theme_buttons.items():
+                btn.setChecked(theme_id == current_theme_id)
+
+    def toggle_dark_mode(self, checked):
+        """切换深色模式"""
+        self.theme_manager.is_dark_mode = checked
+        # 保存深色模式设置
+        self.config.set('app', 'dark_mode', checked)
+        self.theme_manager.apply_theme()
+
+        mode_text = "深色模式" if checked else "浅色模式"
+        self.status_bar.showMessage(f"✅ 已切换到{mode_text}")
+
+    def on_theme_changed(self, theme_name):
+        """主题改变事件处理"""
+        print(f"🎨 主题已更改: {theme_name}")
 
     def update_usage_data(self):
         """更新数据用量显示 - ，使用异步线程"""
@@ -1934,9 +2078,7 @@ class CursorAccountManagerPro(QMainWindow):
             self.current_email_label.setText("当前账号: 未登录或未检测到")
             self.current_subscription_label.setText("订阅类型: 无")
             # 设置未登录状态的颜色
-            self.current_subscription_label.setStyleSheet("color: #888888;")
             self.current_usage_label.setText("使用额度: 无法获取")
-            self.current_usage_label.setStyleSheet("color: #888888;")
             self.status_bar.showMessage("❌ 获取账号信息失败")
             return
 
@@ -1945,6 +2087,7 @@ class CursorAccountManagerPro(QMainWindow):
         subscription_display = account_details.get("subscription_display", "未知")
         aggregated_usage_cost = account_details.get("aggregated_usage_cost", 0.0)
         monthly_invoice_cost = account_details.get("monthly_invoice_cost", 0.0)
+        trial_usage_cost = account_details.get("trial_usage_cost", 0.0)
         trial_days = account_details.get("trial_days", 0)
         source = account_details.get("source", "unknown")
 
@@ -1954,7 +2097,7 @@ class CursorAccountManagerPro(QMainWindow):
         print(f"数据来源: {source}")
 
         # 更新顶部面板信息
-        display_email = email if len(email) <= 30 else f"{email[:30]}..."
+        display_email = email if len(email) <= 50 else f"{email[:50]}..."
         self.current_email_label.setText(f"当前账号: {display_email}")
         self.current_email_label.setToolTip(email)
 
@@ -1966,42 +2109,21 @@ class CursorAccountManagerPro(QMainWindow):
         self.current_subscription_label.setText(
             f'订阅类型: <span style="color: {color_hex};">{subscription_display}</span>'
         )
-        self.current_subscription_label.setStyleSheet("color: #cccccc;")  # 标签文字保持灰色
+        self.update_usage_cost_display(aggregated_usage_cost, monthly_invoice_cost)
 
-        # 显示订阅类型和使用费用
-        if subscription == "pro":
-            if isinstance(aggregated_usage_cost, (int, float)) and isinstance(monthly_invoice_cost, (int, float)):
-                self.update_usage_cost_display(aggregated_usage_cost, monthly_invoice_cost)
-            else:
-                print("费用数据格式错误")
-                self.current_usage_label.setText("使用额度: 费用查询失败")
-                self.current_usage_label.setStyleSheet("color: #FF9800;")  # 橙色警告
-        elif subscription == "free_trial" and trial_days > 0:
-            trial_usage_cost = account_details.get("trial_usage_cost", 0.0)
-            if trial_usage_cost > 0:
-                display_text = f"{trial_usage_cost:.2f}$/{trial_days}天"
-                print(f"试用版费用显示: {display_text}")
-                self.current_usage_label.setText(f"试用额度: {display_text}")
-                self.current_usage_label.setStyleSheet("color: #FF00FF;")  # 紫色试用
-            else:
-                display_text = f"{trial_days}天"
-                print(f"试用版天数显示: {display_text}")
-                self.current_usage_label.setText(f"试用额度: {display_text}")
-                self.current_usage_label.setStyleSheet("color: #FF00FF;")  # 紫色试用
-        else:
-            self.current_usage_label.setText("使用额度: 查询完成")
-            self.current_usage_label.setStyleSheet("color: #cccccc;")
+        if trial_usage_cost > 0:
+            display_text = f"{trial_usage_cost:.2f}$/{trial_days}天"
+            print(f"试用版费用显示: {display_text}")
+            self.current_usage_label.setText(f"试用额度: {display_text}")
 
-        self.status_bar.showMessage(f"✅ 账号信息更新完成 (来源: {source})")
+        self.status_bar.showMessage("✅ 账号信息更新完成")
         print("=== 顶部账号信息更新完成 ===")
 
     def update_usage_cost_display(self, aggregated_usage_cost, monthly_invoice_cost):
-        """更新使用费用显示，显示(A+B=C$)格式"""
+        """更新使用费用显示，显示(A+B=C$)格式，精确到小数点后2位"""
         try:
             total_sum = aggregated_usage_cost + monthly_invoice_cost
-            display_text = (
-                f"({int(round(aggregated_usage_cost))}+{int(round(monthly_invoice_cost))}={int(round(total_sum))}$)"
-            )
+            display_text = f"({aggregated_usage_cost:.2f}+{monthly_invoice_cost:.2f}={total_sum:.2f}$)"
 
             # 根据总费用确定颜色 - 和原项目完全一样
             if total_sum < 50:
@@ -2016,9 +2138,13 @@ class CursorAccountManagerPro(QMainWindow):
 
             print(f"费用显示: {display_text}, 颜色: {color}, 提示: {tooltip}")
 
-            # 更新顶部面板的使用额度标签 - 清晰可见！
-            self.current_usage_label.setText(f"使用额度: {display_text}")
-            self.current_usage_label.setStyleSheet(f"color: {color}; font-weight: bold;")
+            # 更新顶部面板的使用额度标签 - 数字公式用红色
+            # 分离文字和数字公式，数字用红色显示
+            text_part = "使用额度: "
+            number_part = display_text  # 包含括号的部分
+            self.current_usage_label.setText(
+                f'{text_part}<span style="color: #dc3545; font-weight: bold;">{number_part}</span>'
+            )
             self.current_usage_label.setToolTip(
                 f"{tooltip} - a值(聚合费用): {aggregated_usage_cost:.2f}$, b值(月度账单): {monthly_invoice_cost:.2f}$"
             )
@@ -2026,4 +2152,3 @@ class CursorAccountManagerPro(QMainWindow):
         except Exception as e:
             print(f"更新使用费用显示时出错: {e}")
             self.current_usage_label.setText("使用额度: 计算错误")
-            self.current_usage_label.setStyleSheet("color: #FF0000;")

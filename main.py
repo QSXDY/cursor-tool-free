@@ -25,27 +25,29 @@ app = None
 
 def cleanup():
     """清理资源"""
-    global main_window, app
-    # main_window和app在main()函数中赋值
-    if main_window is not None:
-        print("🔧 清理线程资源...")
-        try:
-            # 清理刷新线程
-            if hasattr(main_window, "refresh_threads"):
-                for thread in main_window.refresh_threads.values():
-                    if thread and thread.isRunning():
-                        thread.stop()
-                        thread.wait(1000)
+    # 使用全局变量，但无需global声明（只读取不赋值）
+    try:
+        if main_window is not None:
+            print("🔧 清理线程资源...")
+            try:
+                # 清理刷新线程
+                if hasattr(main_window, "refresh_threads"):
+                    for thread in main_window.refresh_threads.values():
+                        if thread and thread.isRunning():
+                            thread.stop()
+                            thread.wait(1000)
 
-            # 清理使用额度更新线程
-            if hasattr(main_window, "_current_update_thread") and main_window._current_update_thread:
-                if main_window._current_update_thread.isRunning():
-                    main_window._current_update_thread.quit()
-                    main_window._current_update_thread.wait(1000)
+                # 清理使用额度更新线程
+                if hasattr(main_window, "_current_update_thread") and main_window._current_update_thread:
+                    if main_window._current_update_thread.isRunning():
+                        main_window._current_update_thread.quit()
+                        main_window._current_update_thread.wait(1000)
 
-            print("✅ 资源清理完成")
-        except Exception as e:
-            print(f"⚠️ 清理资源时出错: {e}")
+                print("✅ 资源清理完成")
+            except Exception as e:
+                print(f"⚠️ 清理资源时出错: {e}")
+    except NameError:
+        print("⚠️ 清理时变量未定义")
 
 
 def signal_handler(sig, frame):
