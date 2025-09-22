@@ -1,0 +1,234 @@
+# 自动化发布工作流
+# 当推送版本标签时自动构建和发布跨平台可执行文件
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # 匹配 v1.0.0、v1.2.3 等版本标签
+
+permissions:
+  contents: write  # 需要写权限来创建release
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      tag_name: ${{ steps.get_version.outputs.tag_name }}
+    steps:
+    - name: Get version from tag
+      id: get_version
+      run: |
+        echo "tag_name=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+    
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.get_version.outputs.tag_name }}
+        release_name: 'Cursor Tool Free ${{ steps.get_version.outputs.tag_name }}'
+        body: |
+          🎉 **Cursor Tool Free ${{ steps.get_version.outputs.tag_name }}** 发布！
+          
+          ## 📦 下载链接
+          
+          - 🪟 **Windows**: CursorToolFree-Windows.exe
+          - 🍎 **macOS**: CursorToolFree-macOS.dmg  
+          - 🐧 **Linux**: CursorToolFree-Linux.AppImage
+          
+          ## ✨ 主要功能
+          
+          - 🔐 专业的Cursor账号管理系统
+          - 📱 现代化用户界面
+          - 🌍 完整跨平台支持
+          - 🛡️ 账号安全与隐私保护
+          - 🌐 浏览器Cookie导入支持
+          
+          ## 🚀 快速开始
+          
+          1. 下载对应平台的可执行文件
+          2. 双击运行（首次启动会要求设置Cursor路径）
+          3. 开始管理你的Cursor账号
+          
+          ---
+          
+          💡 如需源码安装或二次开发，请查看 [README.md](https://github.com/QSXDY/cursor-tool-free#readme)
+        draft: false
+        prerelease: false
+
+  build-windows:
+    needs: create-release
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements_browser.txt
+        pip install pyinstaller
+    
+    - name: Build Windows executable
+      run: |
+        pyinstaller --onefile --windowed --name "CursorToolFree" main.py ^
+          --add-data "src;src" ^
+          --hidden-import PyQt6 ^
+          --icon=icon.ico ^
+          --version-file=version_info.txt
+    
+    - name: Upload Windows executable
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create-release.outputs.upload_url }}
+        asset_path: ./dist/CursorToolFree.exe
+        asset_name: CursorToolFree-Windows.exe
+        asset_content_type: application/octet-stream
+
+  build-macos:
+    needs: create-release
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements_browser.txt
+        pip install pyinstaller
+        # 安装macOS打包工具
+        brew install create-dmg
+    
+    - name: Build macOS app bundle
+      run: |
+        pyinstaller --onefile --windowed --name "CursorToolFree" main.py \
+          --add-data "src:src" \
+          --hidden-import PyQt6 \
+          --osx-bundle-identifier com.cursor.toolfree
+    
+    - name: Create DMG
+      run: |
+        create-dmg \
+          --volname "Cursor Tool Free" \
+          --volicon "icon.icns" \
+          --window-pos 200 120 \
+          --window-size 600 300 \
+          --icon-size 100 \
+          --icon "CursorToolFree.app" 175 120 \
+          --hide-extension "CursorToolFree.app" \
+          --app-drop-link 425 120 \
+          "CursorToolFree.dmg" \
+          "dist/"
+    
+    - name: Upload macOS DMG
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create-release.outputs.upload_url }}
+        asset_path: ./CursorToolFree.dmg
+        asset_name: CursorToolFree-macOS.dmg
+        asset_content_type: application/octet-stream
+
+  build-linux:
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+    
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          fuse \
+          libfuse2 \
+          libegl1-mesa \
+          libxkbcommon-x11-0 \
+          libxcb-icccm4 \
+          libxcb-image0 \
+          libxcb-keysyms1 \
+          libxcb-randr0 \
+          libxcb-render-util0 \
+          libxcb-xinerama0
+    
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements_browser.txt
+        pip install pyinstaller
+    
+    - name: Build Linux executable
+      run: |
+        pyinstaller --onefile --windowed --name "CursorToolFree" main.py \
+          --add-data "src:src" \
+          --hidden-import PyQt6
+    
+    - name: Download AppImage tools
+      run: |
+        wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+        chmod +x appimagetool-x86_64.AppImage
+    
+    - name: Create AppImage structure
+      run: |
+        mkdir -p AppDir/usr/bin
+        mkdir -p AppDir/usr/share/applications
+        mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+        
+        # 复制可执行文件
+        cp dist/CursorToolFree AppDir/usr/bin/
+        
+        # 创建.desktop文件
+        cat > AppDir/CursorToolFree.desktop << EOF
+        [Desktop Entry]
+        Type=Application
+        Name=Cursor Tool Free
+        Comment=Cursor账号管理工具
+        Exec=CursorToolFree
+        Icon=cursor-tool-free
+        Categories=Development;Utility;
+        EOF
+        
+        # 复制desktop文件到标准位置
+        cp AppDir/CursorToolFree.desktop AppDir/usr/share/applications/
+        
+        # 创建简单图标（如果没有icon.png）
+        touch AppDir/usr/share/icons/hicolor/256x256/apps/cursor-tool-free.png
+    
+    - name: Build AppImage
+      run: |
+        ./appimagetool-x86_64.AppImage AppDir CursorToolFree-Linux.AppImage
+        chmod +x CursorToolFree-Linux.AppImage
+    
+    - name: Upload Linux AppImage
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.create-release.outputs.upload_url }}
+        asset_path: ./CursorToolFree-Linux.AppImage
+        asset_name: CursorToolFree-Linux.AppImage
+        asset_content_type: application/octet-stream

@@ -140,3 +140,57 @@ python main.py                   # 功能测试
 6. **创建 Pull Request**
 
 我们维护**严格的代码质量标准**，所有PR都会通过自动化检查！
+
+## 🚀 自动化发布系统
+
+### 📦 版本发布流程
+
+我们使用**Git标签触发的自动化发布**系统：
+
+#### 发布新版本：
+```bash
+# Windows用户
+release.bat
+
+# Linux/macOS用户  
+chmod +x release.sh
+./release.sh
+```
+
+#### 自动化构建：
+当你推送版本标签（如`v1.0.1`）时，GitHub Actions会自动：
+
+1. **🪟 Windows**: 构建 `CursorToolFree-Windows.exe`
+2. **🍎 macOS**: 构建 `CursorToolFree-macOS.dmg`  
+3. **🐧 Linux**: 构建 `CursorToolFree-Linux.AppImage`
+4. **📋 创建GitHub Release**: 自动发布到Releases页面
+
+#### 手动发布（高级）：
+```bash
+# 1. 提交所有更改
+git add .
+git commit -m "Prepare for v1.0.1"
+
+# 2. 创建版本标签
+git tag -a v1.0.1 -m "Release v1.0.1"
+
+# 3. 推送标签（触发自动构建）
+git push origin main
+git push origin v1.0.1
+
+# 4. GitHub Actions自动构建并发布
+```
+
+### 📁 发布产物
+
+每次发布会自动生成：
+- **Windows**: 单文件exe，包含所有依赖
+- **macOS**: 标准dmg安装包，支持拖拽安装
+- **Linux**: AppImage便携应用，无需安装
+
+### 🔧 版本管理
+
+- 版本号格式：`v主版本.次版本.修订版本` (如: v1.0.0)
+- 自动更新代码中的版本信息
+- 自动生成Release Notes
+- 保留完整的版本历史
