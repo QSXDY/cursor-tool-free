@@ -5,8 +5,11 @@ Cursor管理模块 - 核心管理功能
 
 import hashlib
 import json
+import logging
 import os
+import platform
 import shutil
+import sqlite3
 import uuid
 from datetime import datetime
 
@@ -529,15 +532,12 @@ class CursorManager:
             from ..config import Config
         except ImportError:
             # 直接导入模式（用于测试）
-            import os
             import sys
 
             sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
             from config import Config
 
         config = Config.get_instance()
-        import platform
-
         system = platform.system().lower()
 
         # 1. 首先检查默认安装路径

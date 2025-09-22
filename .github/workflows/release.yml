@@ -26,12 +26,10 @@ jobs:
     
     - name: Create Release
       id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: softprops/action-gh-release@v1
       with:
         tag_name: ${{ steps.get_version.outputs.tag_name }}
-        release_name: 'Cursor Tool Free ${{ steps.get_version.outputs.tag_name }}'
+        name: 'Cursor Tool Free ${{ steps.get_version.outputs.tag_name }}'
         body: |
           🎉 **Cursor Tool Free ${{ steps.get_version.outputs.tag_name }}** 发布！
           
@@ -81,21 +79,13 @@ jobs:
     
     - name: Build Windows executable
       run: |
-        pyinstaller --onefile --windowed --name "CursorToolFree" main.py ^
-          --add-data "src;src" ^
-          --hidden-import PyQt6 ^
-          --icon=icon.ico ^
-          --version-file=version_info.txt
+        pyinstaller --onefile --windowed --name "CursorToolFree" main.py --add-data "src;src" --hidden-import PyQt6 --icon=icon.ico
     
     - name: Upload Windows executable
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: softprops/action-gh-release@v1
       with:
-        upload_url: ${{ needs.create-release.outputs.upload_url }}
-        asset_path: ./dist/CursorToolFree.exe
-        asset_name: CursorToolFree-Windows.exe
-        asset_content_type: application/octet-stream
+        tag_name: ${{ needs.create-release.outputs.tag_name }}
+        files: ./dist/CursorToolFree.exe
 
   build-macos:
     needs: create-release
@@ -114,39 +104,19 @@ jobs:
         pip install -r requirements.txt
         pip install -r requirements_browser.txt
         pip install pyinstaller
-        # 安装macOS打包工具
-        brew install create-dmg
     
-    - name: Build macOS app bundle
+    - name: Build macOS executable
       run: |
         pyinstaller --onefile --windowed --name "CursorToolFree" main.py \
           --add-data "src:src" \
           --hidden-import PyQt6 \
-          --osx-bundle-identifier com.cursor.toolfree
+          --icon=icon.png
     
-    - name: Create DMG
-      run: |
-        create-dmg \
-          --volname "Cursor Tool Free" \
-          --volicon "icon.icns" \
-          --window-pos 200 120 \
-          --window-size 600 300 \
-          --icon-size 100 \
-          --icon "CursorToolFree.app" 175 120 \
-          --hide-extension "CursorToolFree.app" \
-          --app-drop-link 425 120 \
-          "CursorToolFree.dmg" \
-          "dist/"
-    
-    - name: Upload macOS DMG
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Upload macOS executable
+      uses: softprops/action-gh-release@v1
       with:
-        upload_url: ${{ needs.create-release.outputs.upload_url }}
-        asset_path: ./CursorToolFree.dmg
-        asset_name: CursorToolFree-macOS.dmg
-        asset_content_type: application/octet-stream
+        tag_name: ${{ needs.create-release.outputs.tag_name }}
+        files: ./dist/CursorToolFree
 
   build-linux:
     needs: create-release
@@ -162,17 +132,7 @@ jobs:
     - name: Install system dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y \
-          fuse \
-          libfuse2 \
-          libegl1-mesa \
-          libxkbcommon-x11-0 \
-          libxcb-icccm4 \
-          libxcb-image0 \
-          libxcb-keysyms1 \
-          libxcb-randr0 \
-          libxcb-render-util0 \
-          libxcb-xinerama0
+        sudo apt-get install -y fuse
     
     - name: Install Python dependencies
       run: |
@@ -185,50 +145,11 @@ jobs:
       run: |
         pyinstaller --onefile --windowed --name "CursorToolFree" main.py \
           --add-data "src:src" \
-          --hidden-import PyQt6
+          --hidden-import PyQt6 \
+          --icon=icon.png
     
-    - name: Download AppImage tools
-      run: |
-        wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
-        chmod +x appimagetool-x86_64.AppImage
-    
-    - name: Create AppImage structure
-      run: |
-        mkdir -p AppDir/usr/bin
-        mkdir -p AppDir/usr/share/applications
-        mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
-        
-        # 复制可执行文件
-        cp dist/CursorToolFree AppDir/usr/bin/
-        
-        # 创建.desktop文件
-        cat > AppDir/CursorToolFree.desktop << EOF
-        [Desktop Entry]
-        Type=Application
-        Name=Cursor Tool Free
-        Comment=Cursor账号管理工具
-        Exec=CursorToolFree
-        Icon=cursor-tool-free
-        Categories=Development;Utility;
-        EOF
-        
-        # 复制desktop文件到标准位置
-        cp AppDir/CursorToolFree.desktop AppDir/usr/share/applications/
-        
-        # 创建简单图标（如果没有icon.png）
-        touch AppDir/usr/share/icons/hicolor/256x256/apps/cursor-tool-free.png
-    
-    - name: Build AppImage
-      run: |
-        ./appimagetool-x86_64.AppImage AppDir CursorToolFree-Linux.AppImage
-        chmod +x CursorToolFree-Linux.AppImage
-    
-    - name: Upload Linux AppImage
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Upload Linux executable
+      uses: softprops/action-gh-release@v1
       with:
-        upload_url: ${{ needs.create-release.outputs.upload_url }}
-        asset_path: ./CursorToolFree-Linux.AppImage
-        asset_name: CursorToolFree-Linux.AppImage
-        asset_content_type: application/octet-stream
+        tag_name: ${{ needs.create-release.outputs.tag_name }}
+        files: ./dist/CursorToolFree
