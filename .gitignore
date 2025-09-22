@@ -47,6 +47,15 @@ temp/
 tmp/
 *.tmp
 
+# PyInstaller build files
+build/
+dist/
+*.spec
+
 # User data
 user_data/
 config/settings.json
+
+# Generated icons (keep source, ignore generated)
+# icon.png  # Keep source icon
+# icon.ico  # Keep generated for reference
