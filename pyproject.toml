@@ -1,0 +1,22 @@
+[tool.black]
+line-length = 120
+skip-string-normalization = true
+target-version = ['py310']
+
+[tool.isort]
+profile = "black"
+line_length = 120
+multi_line_output = 3
+
+[tool.flake8]
+max-line-length = 120
+ignore = [
+    "F403",  # star imports (PyQt6使用)
+    "F405",  # may be undefined from star imports (PyQt6使用)
+    "W293",  # blank line contains whitespace
+    "E203",  # whitespace before ':' (black兼容)
+]
+per-file-ignores = [
+    "__init__.py:F401",  # 允许__init__.py中有未使用的导入
+]
+max-complexity = 15

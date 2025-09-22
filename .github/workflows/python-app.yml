@@ -18,8 +18,8 @@ jobs:
     strategy:
       fail-fast: false  # 允许部分平台失败
       matrix:
-        os: [windows-latest, ubuntu-latest]  # 移除macOS减少复杂性
-        python-version: ["3.10", "3.11"]      # 减少Python版本，专注主流版本
+        os: [windows-latest, ubuntu-latest, macos-latest]  # 支持全平台
+        python-version: ["3.10", "3.11", "3.12"]           # 支持主流Python版本
 
     steps:
     - uses: actions/checkout@v4
@@ -48,35 +48,65 @@ jobs:
         export DISPLAY=:99
         Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
     
-    - name: Lint with flake8 (warnings only)
-      continue-on-error: true
+    - name: Strict code quality check
       run: |
-        # 只检查严重错误，忽略全局变量警告
-        flake8 . --count --select=E9,F63,F7 --show-source --statistics || true
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        # 严格的代码质量检查 - 不容忍低质量代码
+        pip install black isort autoflake flake8
+        
+        # 检查代码格式化状态
+        black --check --line-length=120 . || (echo "❌ 代码格式不规范，请运行 black . --line-length=120" && exit 1)
+        
+        # 检查导入排序
+        isort --check-only --profile black . || (echo "❌ 导入排序不规范，请运行 isort . --profile black" && exit 1)
+        
+        # 严格的代码质量检查
+        flake8 . --max-line-length=120 --ignore=F403,F405,W293,E203,W503,F824,E402 --count
+        
+        echo "✅ 严格代码质量检查通过"
     
-    - name: Test imports
+    - name: Syntax validation
       run: |
-        # 测试主要模块导入
-        python -c "import sys; sys.path.insert(0, 'src'); from config import Config; print('✅ Config模块导入成功')"
-        python -c "import sys; sys.path.insert(0, 'src'); from utils.cursor_manager import CursorManager; print('✅ CursorManager模块导入成功')"
+        # 确保Python语法正确
+        python -m py_compile main.py
+        python -m py_compile src/config.py
+        python -m py_compile src/constants.py
+        echo "✅ 语法检查通过"
     
-    - name: Test browser manager (optional)
-      continue-on-error: true
-      run: |
-        python -c "import sys; sys.path.insert(0, 'src'); from utils.browser_manager import BrowserManager; print('✅ BrowserManager模块导入成功')"
-    
-    - name: Test configuration
+    - name: Core modules test
       env:
-        QT_QPA_PLATFORM: offscreen  # headless模式
+        QT_QPA_PLATFORM: offscreen
       run: |
+        # 测试核心模块功能
         python -c "
         import sys, os
         sys.path.insert(0, 'src')
+        
+        # 测试配置系统
         from config import Config
         config = Config.get_instance()
-        print('✅ 配置系统初始化成功')
-        print(f'配置目录: {config.config_dir}')
+        print('✅ 配置系统正常')
+        
+        # 测试管理器
+        from utils.cursor_manager import CursorManager
+        print('✅ Cursor管理器正常')
+        
+        # 测试版本检测
+        from utils.cursor_version import CursorVersionDetector
+        print('✅ 版本检测器正常')
+        
+        print('🎉 所有核心功能测试通过')
+        "
+    
+    - name: Browser features test (optional)
+      continue-on-error: true
+      env:
+        QT_QPA_PLATFORM: offscreen
+      run: |
+        python -c "
+        import sys
+        sys.path.insert(0, 'src')
+        from utils.browser_manager import BrowserManager
+        print('✅ 浏览器管理器可选功能正常')
         "
 
   build:
