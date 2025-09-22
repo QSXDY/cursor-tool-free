@@ -24,8 +24,6 @@ class CursorVersionDetector:
             from config import Config
 
         config = Config.get_instance()
-        import platform
-
         system = platform.system()
 
         # 1. 优先使用配置中保存的路径

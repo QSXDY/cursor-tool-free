@@ -75,7 +75,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install -r requirements_browser.txt
-        pip install pyinstaller
+        pip install pyinstaller Pillow
     
     - name: Build Windows executable
       run: |
@@ -103,14 +103,23 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install -r requirements_browser.txt
-        pip install pyinstaller
+        pip install pyinstaller Pillow
     
-    - name: Build macOS executable
+    - name: Generate macOS icon
       run: |
-        pyinstaller --onefile --windowed --name "CursorToolFree" main.py \
+        python3 -c "
+        from PIL import Image
+        img = Image.open('icon.png')
+        img.save('icon.icns', format='ICNS')
+        print('✅ macOS ICNS图标生成完成')
+        "
+        
+    - name: Build macOS executable  
+      run: |
+        pyinstaller --onefile --name "CursorToolFree" main.py \
           --add-data "src:src" \
           --hidden-import PyQt6 \
-          --icon=icon.png
+          --icon=icon.icns
     
     - name: Upload macOS executable
       uses: softprops/action-gh-release@v1

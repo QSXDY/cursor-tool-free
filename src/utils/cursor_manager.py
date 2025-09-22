@@ -5,7 +5,6 @@ Cursor管理模块 - 核心管理功能
 
 import hashlib
 import json
-import logging
 import os
 import platform
 import shutil
@@ -135,7 +134,6 @@ class CursorManager:
             tuple: (是否成功, 消息)
         """
         try:
-            import sqlite3
             import sys
 
             # 获取数据库路径
