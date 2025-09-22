@@ -82,10 +82,14 @@ jobs:
         pyinstaller --onefile --windowed --name "CursorToolFree" main.py --add-data "src;src" --hidden-import PyQt6 --icon=icon.ico
     
     - name: Upload Windows executable
+      run: |
+        mv dist/CursorToolFree.exe dist/CursorToolFree-Windows.exe
+        
+    - name: Upload to release
       uses: softprops/action-gh-release@v1
       with:
         tag_name: ${{ needs.create-release.outputs.tag_name }}
-        files: ./dist/CursorToolFree.exe
+        files: ./dist/CursorToolFree-Windows.exe
 
   build-macos:
     needs: create-release
@@ -116,16 +120,22 @@ jobs:
         
     - name: Build macOS executable  
       run: |
-        pyinstaller --onefile --name "CursorToolFree" main.py \
+        pyinstaller --onedir --windowed --name "CursorToolFree" main.py \
           --add-data "src:src" \
           --hidden-import PyQt6 \
-          --icon=icon.icns
+          --icon=icon.icns \
+          --osx-bundle-identifier com.cursor.toolfree
     
-    - name: Upload macOS executable
+    - name: Prepare macOS executable
+      run: |
+        # macOS --onedir模式生成.app目录，需要压缩
+        cd dist && tar -czf CursorToolFree-macOS.tar.gz CursorToolFree.app
+        
+    - name: Upload to release
       uses: softprops/action-gh-release@v1
       with:
         tag_name: ${{ needs.create-release.outputs.tag_name }}
-        files: ./dist/CursorToolFree
+        files: ./dist/CursorToolFree-macOS.tar.gz
 
   build-linux:
     needs: create-release
@@ -158,7 +168,11 @@ jobs:
           --icon=icon.png
     
     - name: Upload Linux executable
+      run: |
+        mv dist/CursorToolFree dist/CursorToolFree-Linux
+        
+    - name: Upload to release
       uses: softprops/action-gh-release@v1
       with:
         tag_name: ${{ needs.create-release.outputs.tag_name }}
-        files: ./dist/CursorToolFree
+        files: ./dist/CursorToolFree-Linux
