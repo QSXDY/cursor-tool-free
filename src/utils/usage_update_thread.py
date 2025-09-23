@@ -499,10 +499,110 @@ class UsageUpdateThread(QThread):
             return 0.0
 
     def _get_trial_usage_cost(self, session_token):
-        """获取试用版费用API"""
+        """获取试用版费用API - 融入逆向代码的详细接口支持"""
         try:
-            # 试用版也使用聚合费用API，但处理方式不同
+            # 尝试使用逆向代码验证的详细接口
+            detailed_cost = self._get_trial_detailed_usage_cost(session_token)
+            if detailed_cost is not None and detailed_cost > 0:
+                print(f"✅ 使用详细试用版接口: {detailed_cost}$")
+                return detailed_cost
+
+            # 回退到原有的聚合接口（保持原有逻辑）
+            print("🔄 详细接口无数据，使用聚合接口")
             return self._get_aggregated_usage_cost(session_token)
         except Exception as e:
             print(f"❌ 试用版费用API异常: {e}")
+            return 0.0
+
+    def _get_trial_detailed_usage_cost(self, session_token):
+        """获取试用版详细使用费用 - 基于逆向代码的get-filtered-usage-events接口"""
+        try:
+            import requests
+            import time
+            from .platform_utils import get_user_agent
+
+            # 使用逆向代码验证的请求头格式
+            headers = {
+                'accept': '*/*',
+                'accept-language': 'zh-CN,zh;q=0.9',
+                'content-type': 'application/json',
+                'origin': 'https://cursor.com',
+                'priority': 'u=1, i',
+                'referer': 'https://cursor.com/cn/dashboard?tab=usage',
+                'sec-ch-ua': '"Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"',
+                'sec-ch-ua-arch': 'arm',
+                'sec-ch-ua-bitness': '64',
+                'sec-ch-ua-mobile': '?0',
+                'sec-ch-ua-platform': 'macOS',
+                'sec-ch-ua-platform-version': '15.4.1',
+                'sec-fetch-dest': 'empty',
+                'sec-fetch-mode': 'cors',
+                'sec-fetch-site': 'same-origin',
+                'user-agent': get_user_agent(),
+            }
+
+            # 使用逆向代码验证的Cookie格式
+            cookies = {'WorkosCursorSessionToken': session_token, 'NEXT_LOCALE': 'cn', 'GCLB': '"5842dcc315de8632"'}
+
+            # 使用逆向代码验证的时间范围计算
+            end_time = int(time.time() * 1000)
+            start_time = end_time - (30 * 24 * 60 * 60 * 1000)  # 30天
+
+            # 使用逆向代码验证的请求参数
+            data = {
+                "teamId": 0,  # 逆向代码验证：试用版固定为0
+                "startDate": str(start_time),  # 逆向代码格式：字符串时间戳
+                "endDate": str(end_time),  # 逆向代码格式：字符串时间戳
+                "page": 1,
+                "pageSize": 100,
+            }
+
+            print("🔍 [试用版详细] 调用get-filtered-usage-events接口")
+            response = requests.post(
+                'https://cursor.com/api/dashboard/get-filtered-usage-events',
+                headers=headers,
+                cookies=cookies,
+                json=data,
+                timeout=10,
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+
+                # 使用逆向代码验证的费用计算逻辑
+                return self._calculate_trial_usage_from_events(result)
+            else:
+                print(f"⚠️ 试用版详细接口失败: {response.status_code}")
+                return None
+
+        except Exception as e:
+            print(f"❌ 试用版详细接口异常: {e}")
+            return None
+
+    def _calculate_trial_usage_from_events(self, usage_data):
+        """计算试用版事件费用 - 基于逆向代码的计算逻辑"""
+        try:
+            if not usage_data or 'usageEventsDisplay' not in usage_data:
+                return 0.0
+
+            total_cents = 0.0
+            usage_events = usage_data.get('usageEventsDisplay', [])
+
+            for event in usage_events:
+                token_usage = event.get('tokenUsage', {})
+                if token_usage and 'totalCents' in token_usage:
+                    event_cost = float(token_usage['totalCents'])
+                    total_cents += event_cost
+
+            # 转换为美元（基于逆向代码的计算方式）
+            total_dollars = round(total_cents / 100.0, 4)
+
+            if total_dollars > 0:
+                print(f"✅ 试用版详细费用: {total_cents} cents = {total_dollars}$")
+                print(f"✅ 共 {len(usage_events)} 条使用记录")
+
+            return total_dollars
+
+        except Exception as e:
+            print(f"❌ 计算试用版费用失败: {e}")
             return 0.0

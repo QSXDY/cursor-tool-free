@@ -65,25 +65,38 @@ class JWTUtils:
 
     @staticmethod
     def extract_user_id_from_token(token):
-        """从JWT token中提取用户ID"""
+        """从JWT token中提取用户ID - 融入逆向代码的auth0格式支持"""
         try:
+            if not token or not isinstance(token, str):
+                return None
+
             payload = JWTUtils.decode_jwt_payload(token)
             if not payload:
                 return None
 
-            # 尝试多种可能的用户ID字段
-            user_id_fields = ["sub", "user_id", "userId", "uid"]
+            # 优先处理sub字段（基于逆向代码的验证逻辑）
+            sub = payload.get('sub')
+            if sub:
+                sub_str = str(sub)
+                # 处理auth0格式：auth0|user_xxx（逆向代码验证的格式）
+                if 'auth0|user_' in sub_str:
+                    return sub_str.replace('auth0|', '')
+                # 处理其他|分隔格式
+                elif '|' in sub_str:
+                    parts = sub_str.split('|')
+                    for part in parts:
+                        if part.startswith('user_'):
+                            return part
+                    return parts[-1]  # 默认返回最后一部分
+                # 直接返回sub值
+                elif sub_str:
+                    return sub_str
 
+            # 尝试其他可能的用户ID字段
+            user_id_fields = ["user_id", "userId", "uid", "id"]
             for field in user_id_fields:
                 user_id = payload.get(field)
                 if user_id:
-                    # 如果sub字段包含|分隔符，取最后一部分
-                    if "|" in str(user_id):
-                        parts = str(user_id).split("|")
-                        for part in parts:
-                            if part.startswith("user_"):
-                                return part
-                        return parts[-1]  # 默认返回最后一部分
                     return str(user_id)
 
             return None
