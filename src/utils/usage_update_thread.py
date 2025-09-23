@@ -517,8 +517,10 @@ class UsageUpdateThread(QThread):
     def _get_trial_detailed_usage_cost(self, session_token):
         """获取试用版详细使用费用 - 基于逆向代码的get-filtered-usage-events接口"""
         try:
-            import requests
             import time
+
+            import requests
+
             from .platform_utils import get_user_agent
 
             # 使用逆向代码验证的请求头格式
