@@ -2,11 +2,14 @@
 """
 浏览器管理器 - 无痕浏览器自动化实现
 支持Chrome/Edge的无痕模式，自动Cookie设置和Dashboard登录
+当DrissionPage不可用时，降级使用系统默认浏览器
 """
 
 import logging
 import os
+import subprocess
 import sys
+import webbrowser
 
 # 检查是否有DrissionPage
 try:
@@ -27,7 +30,7 @@ class BrowserManager:
         self.incognito_mode = incognito_mode
 
         if not DRISSIONPAGE_AVAILABLE:
-            self.logger.warning("DrissionPage未安装，将降级使用简单浏览器打开")
+            self.logger.warning("DrissionPage未安装，将降级使用系统默认浏览器打开")
 
     def get_new_page(self, use_stealth: bool = True):
         """
@@ -49,31 +52,18 @@ class BrowserManager:
                 # 🔧 创建无痕浏览器配置 -
                 co = ChromiumOptions()
 
-                # 🔧 无痕模式设置
-                if self.incognito_mode:
-                    browser_path = self._find_browser_path()
-                    if sys.platform == "win32" and browser_path and "msedge.exe" in browser_path.lower():
-                        co.set_argument("--inprivate")
-                        self.logger.info("✅ 使用Edge无痕模式 (--inprivate)")
-                    else:
-                        co.set_argument("--incognito")
-                        self.logger.info("✅ 使用Chrome无痕模式 (--incognito)")
+                # 🔧 平台特定配置
+                if sys.platform == "win32":
+                    self._configure_windows_browser(co)
+                elif sys.platform == "darwin":
+                    self._configure_macos_browser(co)
+                else:  # Linux
+                    self._configure_linux_browser(co)
 
-                # 🔧 反检测设置 - 精简配置
-                co.set_argument("--exclude-switches=enable-automation")
-                co.set_argument("--no-first-run")
-                co.set_argument("--no-default-browser-check")
-                co.set_argument("--disable-background-networking")
-                co.set_argument("--disable-component-update")
-                co.set_argument("--disable-default-apps")
-                co.set_argument("--disable-component-extensions-with-background-pages")
-
-                # 🔧 窗口设置
-                co.set_argument("--start-maximized")
-                co.headless(False)  # 显示浏览器界面
                 co.auto_port()
 
                 # 🔧 设置浏览器路径
+                browser_path = self._find_browser_path()
                 if browser_path:
                     co.set_browser_path(browser_path)
                     self.logger.info(f"使用浏览器: {browser_path}")
@@ -87,7 +77,87 @@ class BrowserManager:
 
         except Exception as e:
             self.logger.error(f"❌ 启动浏览器失败: {e}")
+            # 在 Linux 下如果 DrissionPage 启动失败，清理可能的僵尸进程
+            if sys.platform == "linux":
+                try:
+                    import subprocess
+
+                    # 清理可能的 Chrome 僵尸进程
+                    subprocess.run(["pkill", "-f", "chrome"], capture_output=True)
+                    subprocess.run(["pkill", "-f", "chromium"], capture_output=True)
+                except Exception:
+                    pass
             return None
+
+    def _configure_windows_browser(self, co):
+        """Windows 浏览器配置 - 保持原有稳定逻辑"""
+        # 无痕模式设置
+        if self.incognito_mode:
+            browser_path = self._find_browser_path()
+            if browser_path and "msedge.exe" in browser_path.lower():
+                co.set_argument("--inprivate")
+                self.logger.info("✅ 使用Edge无痕模式 (--inprivate)")
+            else:
+                co.set_argument("--incognito")
+                self.logger.info("✅ 使用Chrome无痕模式 (--incognito)")
+
+        # 基础设置
+        co.set_argument("--exclude-switches=enable-automation")
+        co.set_argument("--no-first-run")
+        co.set_argument("--no-default-browser-check")
+        co.set_argument("--disable-background-networking")
+        co.set_argument("--disable-component-update")
+        co.set_argument("--disable-default-apps")
+        co.set_argument("--disable-component-extensions-with-background-pages")
+
+        # 窗口设置
+        co.set_argument("--start-maximized")
+        co.headless(False)
+
+    def _configure_macos_browser(self, co):
+        """macOS 浏览器配置 - 保持原有稳定逻辑"""
+        # 无痕模式设置
+        if self.incognito_mode:
+            co.set_argument("--incognito")
+            self.logger.info("✅ 使用Chrome无痕模式 (--incognito)")
+
+        # 基础设置
+        co.set_argument("--exclude-switches=enable-automation")
+        co.set_argument("--no-first-run")
+        co.set_argument("--no-default-browser-check")
+        co.set_argument("--disable-background-networking")
+        co.set_argument("--disable-component-update")
+        co.set_argument("--disable-default-apps")
+        co.set_argument("--disable-component-extensions-with-background-pages")
+
+        # 窗口设置
+        co.set_argument("--start-maximized")
+        co.headless(False)
+
+    def _configure_linux_browser(self, co):
+        """Linux 浏览器配置 - 基础配置"""
+        # 无痕模式设置
+        if self.incognito_mode:
+            co.set_argument("--incognito")
+            self.logger.info("✅ 使用Chrome无痕模式 (--incognito)")
+
+        # 基础设置
+        co.set_argument("--exclude-switches=enable-automation")
+        co.set_argument("--no-first-run")
+        co.set_argument("--no-default-browser-check")
+        co.set_argument("--disable-background-networking")
+        co.set_argument("--disable-component-update")
+        co.set_argument("--disable-default-apps")
+        co.set_argument("--disable-component-extensions-with-background-pages")
+
+        # Linux 必需参数 - 新版兼容方式
+        co.set_argument("--disable-dev-shm-usage")  # 防止内存问题
+        co.set_argument("--disable-gpu")  # 避免GPU相关问题
+        co.set_argument("--remote-debugging-port=0")  # 自动分配调试端口
+
+        # 窗口设置
+        co.set_argument("--start-maximized")
+        co.headless(False)
 
     def _find_browser_path(self):
         """查找可用的浏览器路径 - 完整跨平台版本"""
@@ -215,7 +285,10 @@ class BrowserManager:
             # 🔧 1. 获取无痕浏览器页面
             page = self.get_new_page()
             if not page:
-                return False
+                # DrissionPage 不可用，使用系统默认浏览器降级
+                dashboard_url = "https://cursor.com/dashboard"
+                self.logger.info("🔄 DrissionPage 不可用，使用系统默认浏览器打开 Dashboard")
+                return self.open_url_with_system_browser(dashboard_url)
 
             # 🔧 2. 设置认证Cookie - 流程
             success = self.set_auth_cookie(page, user_id, access_token)
@@ -250,6 +323,36 @@ class BrowserManager:
 
         except Exception as e:
             self.logger.error(f"❌ 打开Dashboard失败: {e}")
+            return False
+
+    def open_url_with_system_browser(self, url: str):
+        """
+        使用系统默认浏览器打开URL（降级方案）
+
+        Args:
+            url: 要打开的URL
+
+        Returns:
+            bool: 是否成功打开
+        """
+        try:
+            if sys.platform == "linux":
+                # Linux: 优先使用 xdg-open（更可靠）
+                try:
+                    subprocess.run(["xdg-open", url], check=True, capture_output=True)
+                    self.logger.info(f"✅ 使用 xdg-open 打开: {url}")
+                    return True
+                except (subprocess.CalledProcessError, FileNotFoundError):
+                    # xdg-open 失败，降级到 webbrowser
+                    pass
+
+            # 跨平台降级：使用 Python 的 webbrowser 模块
+            webbrowser.open(url)
+            self.logger.info(f"✅ 使用系统默认浏览器打开: {url}")
+            return True
+
+        except Exception as e:
+            self.logger.error(f"❌ 打开浏览器失败: {e}")
             return False
 
     def close(self):

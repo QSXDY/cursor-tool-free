@@ -114,7 +114,22 @@ class Config:
         elif sys.platform == "darwin":
             return "/Applications/Cursor.app"
         else:
-            return os.path.expanduser("~/.local/share/cursor")
+            # Linux: 优先检测系统安装位置
+            system_paths = [
+                "/usr/bin/cursor",  # apt/deb 包安装
+                "/usr/local/bin/cursor",  # 手动安装到系统
+                "/snap/bin/cursor",  # snap 包
+                "/var/lib/flatpak/exports/bin/cursor",  # flatpak 系统安装
+                os.path.expanduser("~/.local/bin/cursor"),  # 用户本地安装
+                os.path.expanduser("~/.local/share/cursor"),  # AppImage 解压
+            ]
+
+            for path in system_paths:
+                if os.path.exists(path):
+                    return path
+
+            # 如果都没找到，返回最常见的系统路径
+            return "/usr/bin/cursor"
 
     def _get_default_cursor_data_dir(self):
         """获取Cursor数据目录默认路径"""

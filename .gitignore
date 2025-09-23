@@ -50,11 +50,21 @@ tmp/
 # PyInstaller build files
 build/
 dist/
-*.spec
+# *.spec  # Keep spec file for building
+
+# AppImage build files
+*.AppDir/
+*.AppImage
+appimagetool-*.AppImage
 
 # User data
 user_data/
 config/settings.json
+
+# Virtual environment
+.venv/
+venv/
+env/
 
 # Generated icons (keep source, ignore generated)
 # icon.png  # Keep source icon

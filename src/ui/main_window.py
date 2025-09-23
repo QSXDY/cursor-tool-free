@@ -184,6 +184,14 @@ class CursorAccountManagerPro(QMainWindow):
         import_btn.setProperty("class", "primary")
         layout.addWidget(import_btn)
 
+        # 增加间距，右移提示框
+        layout.addSpacing(10)
+
+        # 浏览器安装提示
+        self.browser_hint_label = self._create_browser_hint()
+        if self.browser_hint_label:
+            layout.addWidget(self.browser_hint_label)
+
         layout.addStretch()
 
         layout.addSpacing(10)
@@ -193,6 +201,73 @@ class CursorAccountManagerPro(QMainWindow):
         layout.addWidget(self.stats_label)
 
         return toolbar
+
+    def _create_browser_hint(self):
+        """创建浏览器安装提示标签 - 跨平台通用检测"""
+        import os
+        import sys
+
+        # 跨平台检查浏览器可用性
+        has_chrome = False
+
+        if sys.platform == "win32":
+            # Windows 检测 Chrome/Edge
+            chrome_paths = [
+                os.path.expandvars(r"%PROGRAMFILES%\Google\Chrome\Application\chrome.exe"),
+                os.path.expandvars(r"%PROGRAMFILES(X86)%\Google\Chrome\Application\chrome.exe"),
+                os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"),
+                os.path.expandvars(r"%PROGRAMFILES(X86)%\Microsoft\Edge\Application\msedge.exe"),
+                os.path.expandvars(r"%PROGRAMFILES%\Microsoft\Edge\Application\msedge.exe"),
+            ]
+            has_chrome = any(os.path.exists(path) for path in chrome_paths)
+        elif sys.platform == "darwin":
+            # macOS 检测 Chrome/Edge/Chromium
+            chrome_paths = [
+                "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+                "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+                "/Applications/Chromium.app/Contents/MacOS/Chromium",
+                os.path.expanduser("~/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
+            ]
+            has_chrome = any(os.path.exists(path) for path in chrome_paths)
+        else:  # Linux
+            # Linux 检测 Chrome/Chromium
+            chrome_paths = [
+                "/usr/bin/google-chrome",
+                "/usr/bin/google-chrome-stable",
+                "/usr/bin/chromium-browser",
+                "/usr/bin/chromium",
+                "/snap/bin/chromium",
+            ]
+            has_chrome = any(os.path.exists(path) for path in chrome_paths)
+
+        if has_chrome:
+            return None  # 有浏览器就不显示提示
+
+        # 创建提示标签
+        hint_label = QLabel()
+        hint_label.setText(
+            "请安装谷歌浏览器获得无痕自动登录官网查询使用情况功能，win也支持EDGE。\n"
+            "否则通过\"E\"图标无法正常自动登陆官方查询额度、用量，安装后重启工具。"
+        )
+        hint_label.setProperty("class", "browser-hint")
+        hint_label.setWordWrap(True)
+        hint_label.setStyleSheet(
+            """
+            QLabel[class="browser-hint"] {
+                color: #FF6B35;
+                font-size: 11px;
+                background-color: rgba(255, 107, 53, 0.1);
+                border: 1px solid rgba(255, 107, 53, 0.3);
+                border-radius: 4px;
+                padding: 4px 12px;
+                margin: 0px;
+                min-width: 400px;
+                max-width: 500px;
+            }
+        """
+        )
+
+        return hint_label
 
     def create_table_container(self):
         """创建表格容器 - 实现卡片效果和边距"""
@@ -1392,11 +1467,22 @@ class CursorAccountManagerPro(QMainWindow):
             # 🔧 ：login_to_dashboard_with_account的实现
             browser_manager = BrowserManager(self.config, incognito_mode=True)
             page = browser_manager.get_new_page()
+
             if not page:
-                self.status_bar.showMessage("❌ 启动浏览器失败")
+                # DrissionPage 不可用，使用系统默认浏览器降级
+                self.status_bar.showMessage("🔄 DrissionPage 不可用，使用系统默认浏览器...")
+                from ..constants import CURSOR_URLS
+
+                dashboard_url = CURSOR_URLS.get("DASHBOARD", "https://cursor.com/dashboard")
+
+                success = browser_manager.open_url_with_system_browser(dashboard_url)
+                if success:
+                    self.status_bar.showMessage(f"✅ 已使用系统浏览器打开 Dashboard（需手动登录账号 {display_name}）")
+                else:
+                    self.status_bar.showMessage("❌ 启动浏览器失败")
                 return
 
-            # 🔧 设置认证Cookie
+            # 🔧 设置认证Cookie（仅 DrissionPage 可用时）
             success = browser_manager.set_auth_cookie(page, user_id, access_token)
             if not success:
                 self.status_bar.showMessage("❌ 设置认证Cookie失败")

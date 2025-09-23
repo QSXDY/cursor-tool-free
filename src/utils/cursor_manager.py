@@ -562,16 +562,15 @@ class CursorManager:
             key_files = ["Contents/MacOS/Cursor", "Contents/Resources/app/out/main.js"]
         else:  # Linux
             possible_paths = [
-                # 系统安装
-                "/usr/local/bin/cursor",
-                "/usr/bin/cursor",
+                # 系统安装 - 检查实际安装目录
+                "/usr/share/cursor",  # apt/deb 包的实际安装目录
+                "/usr/local/share/cursor",  # 手动安装到系统
                 "/opt/cursor",
                 # 用户安装
-                os.path.expanduser("~/.local/bin/cursor"),
                 os.path.expanduser("~/.local/share/cursor"),
                 os.path.expanduser("~/cursor"),
                 # Snap包
-                "/snap/bin/cursor",
+                "/snap/cursor/current",
                 # AppImage
                 os.path.expanduser("~/Applications/Cursor.AppImage"),
                 os.path.expanduser("~/Downloads/cursor"),

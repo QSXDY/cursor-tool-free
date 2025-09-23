@@ -36,8 +36,9 @@ jobs:
           ## 📦 下载链接
           
           - 🪟 **Windows**: CursorToolFree-Windows.exe
-          - 🍎 **macOS**: CursorToolFree-macOS-Universal.dmg (支持Apple Silicon和Intel)
-          - 🐧 **Linux**: CursorToolFree-Linux
+          - 🍎 **macOS (Apple Silicon)**: CursorToolFree-macOS-AppleSilicon.dmg
+          - 🍎 **macOS (Intel)**: CursorToolFree-macOS-Intel.dmg
+          - 🐧 **Linux**: CursorToolFree-Linux.AppImage（双击运行，通杀所有Linux发行版）
           
           ## ✨ 主要功能
           
@@ -97,8 +98,10 @@ jobs:
     strategy:
       matrix:
         include:
-          - arch: universal2
-            name: Universal
+          - arch: arm64
+            name: AppleSilicon
+          - arch: x86_64
+            name: Intel
     steps:
     - uses: actions/checkout@v4
     
@@ -111,8 +114,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        # 跳过requirements_browser.txt以避免psutil的universal2兼容性问题
-        # DrissionPage和pyperclip是可选的浏览器功能，核心功能不受影响
+        pip install -r requirements_browser.txt
         pip install pyinstaller
     
     - name: Verify macOS icon
@@ -177,20 +179,60 @@ jobs:
         pip install -r requirements_browser.txt
         pip install pyinstaller
     
-    - name: Build Linux executable
+    - name: Build Linux AppImage
       run: |
-        pyinstaller --onefile --windowed --name "CursorToolFree" main.py \
-          --add-data "src:src" \
-          --add-data "resources:resources" \
-          --hidden-import PyQt6 \
-          --icon=icon.png
+        # 使用 PyInstaller 生成可执行文件
+        pyinstaller CursorToolFree.spec --clean --noconfirm
+        
+        # 下载 AppImage 工具
+        wget -O appimagetool-x86_64.AppImage https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+        chmod +x appimagetool-x86_64.AppImage
+        
+        # 创建 AppImage 目录结构
+        mkdir -p CursorToolFree.AppDir/usr/bin CursorToolFree.AppDir/usr/share/applications CursorToolFree.AppDir/usr/share/icons/hicolor/512x512/apps
+        cp dist/CursorToolFree CursorToolFree.AppDir/usr/bin/
+        cp -r resources CursorToolFree.AppDir/usr/share/
+        cp icon.png CursorToolFree.AppDir/usr/share/icons/hicolor/512x512/apps/cursor-tool-free.png
+        cp icon.png CursorToolFree.AppDir/cursor-tool-free.png
+        
+        # 创建 .desktop 文件
+        cat > CursorToolFree.AppDir/cursor-tool-free.desktop << 'DESKTOP_EOF'
+        [Desktop Entry]
+        Type=Application
+        Name=Cursor Tool Free
+        Comment=Cursor账号管理工具 - 免费精简版
+        Exec=CursorToolFree
+        Icon=cursor-tool-free
+        Categories=Development;
+        Terminal=false
+        StartupWMClass=CursorToolFree
+        Keywords=cursor;account;manager;开发;账号;管理;
+        GenericName=Cursor Account Manager
+        X-AppImage-Version=1.0.0
+        DESKTOP_EOF
+        
+        # 创建 AppRun 脚本
+        cat > CursorToolFree.AppDir/AppRun << 'APPRUN_EOF'
+        #!/bin/bash
+        HERE="$(dirname "$(readlink -f "${0}")")"
+        export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-xcb}"
+        exec "${HERE}/usr/bin/CursorToolFree" "$@"
+        APPRUN_EOF
+        chmod +x CursorToolFree.AppDir/AppRun
+        
+        # 复制 .desktop 文件并创建 .DirIcon 符号链接
+        cp CursorToolFree.AppDir/cursor-tool-free.desktop CursorToolFree.AppDir/usr/share/applications/
+        cd CursorToolFree.AppDir && ln -sf cursor-tool-free.png .DirIcon && cd ..
+        
+        # 生成 AppImage
+        ARCH=x86_64 ./appimagetool-x86_64.AppImage CursorToolFree.AppDir CursorToolFree-Linux.AppImage
     
-    - name: Upload Linux executable
+    - name: Upload Linux AppImage
       run: |
-        mv dist/CursorToolFree dist/CursorToolFree-Linux
+        # AppImage 已经是最终文件，无需重命名
         
     - name: Upload to release
       uses: softprops/action-gh-release@v1
       with:
         tag_name: ${{ needs.create-release.outputs.tag_name }}
-        files: ./dist/CursorToolFree-Linux
+        files: ./CursorToolFree-Linux.AppImage
