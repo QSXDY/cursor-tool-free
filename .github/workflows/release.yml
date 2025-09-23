@@ -94,14 +94,16 @@ jobs:
 
   build-macos:
     needs: create-release
-    runs-on: macos-latest
     strategy:
       matrix:
         include:
           - arch: arm64
             name: AppleSilicon
+            runs-on: macos-latest
           - arch: x86_64
             name: Intel
+            runs-on: macos-13  # 使用 Intel 构建环境
+    runs-on: ${{ matrix.runs-on }}
     steps:
     - uses: actions/checkout@v4
     
@@ -129,8 +131,7 @@ jobs:
           --add-data "resources:resources" \
           --hidden-import PyQt6 \
           --icon=icon.icns \
-          --osx-bundle-identifier com.cursor.toolfree \
-          --target-arch ${{ matrix.arch }}
+          --osx-bundle-identifier com.cursor.toolfree
     
     - name: Create DMG
       run: |
