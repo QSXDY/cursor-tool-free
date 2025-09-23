@@ -36,8 +36,8 @@ jobs:
           ## 📦 下载链接
           
           - 🪟 **Windows**: CursorToolFree-Windows.exe
-          - 🍎 **macOS**: CursorToolFree-macOS.dmg  
-          - 🐧 **Linux**: CursorToolFree-Linux.AppImage
+          - 🍎 **macOS**: CursorToolFree-macOS-Universal.dmg (支持Apple Silicon和Intel)
+          - 🐧 **Linux**: CursorToolFree-Linux
           
           ## ✨ 主要功能
           
@@ -79,7 +79,7 @@ jobs:
     
     - name: Build Windows executable
       run: |
-        pyinstaller --onefile --windowed --name "CursorToolFree" main.py --add-data "src;src" --hidden-import PyQt6 --icon=icon.ico
+        pyinstaller --onefile --windowed --name "CursorToolFree" main.py --add-data "src;src" --add-data "resources;resources" --hidden-import PyQt6 --icon=icon.ico
     
     - name: Upload Windows executable
       run: |
@@ -94,6 +94,11 @@ jobs:
   build-macos:
     needs: create-release
     runs-on: macos-latest
+    strategy:
+      matrix:
+        include:
+          - arch: universal2
+            name: Universal
     steps:
     - uses: actions/checkout@v4
     
@@ -122,20 +127,35 @@ jobs:
       run: |
         pyinstaller --onedir --windowed --name "CursorToolFree" main.py \
           --add-data "src:src" \
+          --add-data "resources:resources" \
           --hidden-import PyQt6 \
           --icon=icon.icns \
-          --osx-bundle-identifier com.cursor.toolfree
+          --osx-bundle-identifier com.cursor.toolfree \
+          --target-arch ${{ matrix.arch }}
     
-    - name: Prepare macOS executable
+    - name: Create DMG
       run: |
-        # macOS --onedir模式生成.app目录，需要压缩
-        cd dist && tar -czf CursorToolFree-macOS.tar.gz CursorToolFree.app
+        # 安装create-dmg工具
+        brew install create-dmg
+        
+        # 创建DMG文件
+        create-dmg \
+          --volname "Cursor Tool Free" \
+          --volicon "icon.icns" \
+          --window-pos 200 120 \
+          --window-size 600 400 \
+          --icon-size 100 \
+          --icon "CursorToolFree.app" 150 200 \
+          --hide-extension "CursorToolFree.app" \
+          --app-drop-link 450 200 \
+          "CursorToolFree-macOS-${{ matrix.name }}.dmg" \
+          "dist/"
         
     - name: Upload to release
       uses: softprops/action-gh-release@v1
       with:
         tag_name: ${{ needs.create-release.outputs.tag_name }}
-        files: ./dist/CursorToolFree-macOS.tar.gz
+        files: ./CursorToolFree-macOS-${{ matrix.name }}.dmg
 
   build-linux:
     needs: create-release
@@ -164,6 +184,7 @@ jobs:
       run: |
         pyinstaller --onefile --windowed --name "CursorToolFree" main.py \
           --add-data "src:src" \
+          --add-data "resources:resources" \
           --hidden-import PyQt6 \
           --icon=icon.png
     
