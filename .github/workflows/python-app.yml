@@ -49,28 +49,24 @@ jobs:
         Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
     
     - name: Strict code quality check
+      shell: bash
       run: |
         # 严格的代码质量检查 - 不容忍低质量代码
         pip install -r requirements-dev.txt
         
         # 检查代码格式化状态
-        black --check --line-length=120 .
-        if ($LASTEXITCODE -ne 0) {
-          Write-Host "代码格式不规范，请运行 black . --line-length=120"
-          exit 1
-        }
+        echo "检查代码格式化状态..."
+        black --check --line-length=120 . || (echo "❌ 代码格式不规范，请运行: black . --line-length=120" && exit 1)
         
         # 检查导入排序
-        isort --check-only --profile black .
-        if ($LASTEXITCODE -ne 0) {
-          Write-Host "导入排序不规范，请运行 isort . --profile black"
-          exit 1
-        }
+        echo "检查导入排序..."
+        isort --check-only --profile black . || (echo "❌ 导入排序不规范，请运行: isort . --profile black" && exit 1)
         
         # 严格的代码质量检查
+        echo "进行代码质量检查..."
         flake8 . --max-line-length=120 --ignore=F403,F405,W293,E203,W503,F824,E402 --count
         
-        Write-Host "严格代码质量检查通过"
+        echo "✅ 严格代码质量检查通过"
     
     - name: Syntax validation
       run: |
