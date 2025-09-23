@@ -75,7 +75,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install -r requirements_browser.txt
-        pip install pyinstaller Pillow
+        pip install pyinstaller
     
     - name: Build Windows executable
       run: |
@@ -112,16 +112,12 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install -r requirements_browser.txt
-        pip install pyinstaller Pillow
+        pip install pyinstaller
     
-    - name: Generate macOS icon
+    - name: Verify macOS icon
       run: |
-        python3 -c "
-        from PIL import Image
-        img = Image.open('icon.png')
-        img.save('icon.icns', format='ICNS')
-        print('✅ macOS ICNS图标生成完成')
-        "
+        echo "✅ 使用项目中的icon.icns文件"
+        ls -la icon.icns
         
     - name: Build macOS executable  
       run: |
