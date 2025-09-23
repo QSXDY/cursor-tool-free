@@ -111,7 +111,8 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install -r requirements_browser.txt
+        # 跳过requirements_browser.txt以避免psutil的universal2兼容性问题
+        # DrissionPage和pyperclip是可选的浏览器功能，核心功能不受影响
         pip install pyinstaller
     
     - name: Verify macOS icon
