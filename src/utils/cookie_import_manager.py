@@ -19,7 +19,7 @@ class CookieParser:
         cookie_string = cookie_string.strip()
 
         if cookie_string.startswith("WorkosCursorSessionToken="):
-            cookie_string = cookie_string[len("WorkosCursorSessionToken="):]
+            cookie_string = cookie_string[len("WorkosCursorSessionToken=") :]
 
         if "%3A%3A" in cookie_string:
             parts = cookie_string.split("%3A%3A", 1)
