@@ -50,9 +50,17 @@ jobs:
           
           ## 🚀 快速开始
           
+          **Windows / Linux:**
           1. 下载对应平台的可执行文件
-          2. 双击运行（首次启动会要求设置Cursor路径）
-          3. 开始管理你的Cursor账号
+          2. 双击运行
+          
+          **macOS:**
+          1. 下载对应芯片的DMG文件（M系列用Apple Silicon，Intel用Intel）
+          2. 打开DMG，拖拽应用到Applications文件夹
+          3. 🔑 **首次打开**：右键点击应用 → 选择"打开" → 确认
+          4. 之后可正常双击使用
+          
+          💡 详细的macOS使用说明请查看 [MACOS_USER_GUIDE.md](https://github.com/QSXDY/cursor-tool-free/blob/main/MACOS_USER_GUIDE.md)
           
           ---
           
@@ -124,14 +132,20 @@ jobs:
         echo "✅ 使用项目中的icon.icns文件"
         ls -la icon.icns
         
-    - name: Build macOS executable  
+    - name: Build macOS executable with spec file
       run: |
-        pyinstaller --onedir --windowed --name "CursorToolFree" main.py \
-          --add-data "src:src" \
-          --add-data "resources:resources" \
-          --hidden-import PyQt6 \
-          --icon=icon.icns \
-          --osx-bundle-identifier com.cursor.toolfree
+        # 使用spec文件构建，支持BUNDLE配置
+        pyinstaller CursorToolFree.spec --clean --noconfirm
+    
+    - name: Sign macOS app (ad-hoc)
+      run: |
+        # Ad-hoc签名，无需开发者证书
+        echo "🔏 执行ad-hoc签名..."
+        codesign --force --deep --sign - "dist/CursorToolFree.app"
+        
+        # 验证签名
+        echo "🔍 验证签名..."
+        codesign --verify --deep --strict --verbose=2 "dist/CursorToolFree.app" || echo "⚠️ 签名验证警告（可忽略）"
     
     - name: Create DMG
       run: |

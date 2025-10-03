@@ -55,8 +55,13 @@ flake8 . --max-line-length=120
 # 运行测试
 pytest
 
-# 构建可执行文件（包含图标资源）
+# 构建可执行文件
+# Windows/Linux
 pyinstaller CursorToolFree.spec
+
+# macOS（包含自动签名）
+chmod +x build_macos.sh
+./build_macos.sh
 ```
 
 ## ✨ 功能特点
@@ -90,6 +95,7 @@ pyinstaller CursorToolFree.spec
 - **Cursor检测**: 标准安装、Homebrew、用户目录
 - **浏览器支持**: Chrome、Safari、Edge、Firefox、Chromium
 - **安装方式**: .app包、Homebrew Cask
+- **代码签名**: Ad-hoc自签名，首次打开需右键确认
 
 ### Linux
 - **Cursor检测**: 系统安装、AppImage、Snap、Flatpak
@@ -101,6 +107,54 @@ pyinstaller CursorToolFree.spec
 - Python 3.10.11+
 - PyQt6
 - 支持的操作系统: Windows, macOS, Linux
+
+## 🍎 macOS特别说明
+
+### 首次打开应用
+
+由于应用使用ad-hoc签名（无Apple开发者证书），首次打开时需要：
+
+**方法1（推荐）**：
+1. 右键点击应用图标
+2. 选择"打开"
+3. 在弹出的对话框中点击"打开"按钮
+4. 之后可以正常双击使用
+
+**方法2**：
+1. 尝试双击打开（会提示无法打开）
+2. 打开"系统偏好设置" → "安全性与隐私"
+3. 在"通用"选项卡中点击"仍要打开"
+
+**方法3（命令行）**：
+```bash
+# 移除隔离属性
+xattr -d com.apple.quarantine /Applications/CursorToolFree.app
+```
+
+### 开发者构建说明
+
+在macOS上构建应用：
+
+```bash
+# 1. 安装依赖
+pip install -r requirements.txt
+pip install pyinstaller
+
+# 2. 运行构建脚本（自动签名）
+chmod +x build_macos.sh
+./build_macos.sh
+
+# 3. 构建产物
+# - dist/CursorToolFree.app （应用包）
+# - dist/CursorToolFree-macOS.dmg （DMG安装包，需要create-dmg）
+# - dist/CursorToolFree-macOS.zip （ZIP压缩包）
+```
+
+**可选工具**：
+```bash
+# 安装create-dmg用于创建DMG安装包
+brew install create-dmg
+```
 
 ## 👨‍💻 开发指南
 
