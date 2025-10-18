@@ -38,7 +38,8 @@ jobs:
           - 🪟 **Windows**: CursorToolFree-Windows.exe
           - 🍎 **macOS (Apple Silicon)**: CursorToolFree-macOS-AppleSilicon.dmg
           - 🍎 **macOS (Intel)**: CursorToolFree-macOS-Intel.dmg
-          - 🐧 **Linux**: CursorToolFree-Linux.AppImage（双击运行，通杀所有Linux发行版）
+          - 🐧 **Linux AppImage**: CursorToolFree-Linux.AppImage（通用，支持所有发行版）
+          - 🐧 **Ubuntu/Debian**: CursorToolFree-Ubuntu.deb（apt安装，推荐Ubuntu用户）
           
           ## ✨ 主要功能
           
@@ -50,9 +51,9 @@ jobs:
           
           ## 🚀 快速开始
           
-          **Windows / Linux:**
-          1. 下载对应平台的可执行文件
-          2. 双击运行
+          **Windows:**
+          1. 下载 `CursorToolFree-Windows.exe`
+          2. 双击运行即可
           
           **macOS:**
           1. 下载对应芯片的DMG文件（M系列用Apple Silicon，Intel用Intel）
@@ -61,6 +62,24 @@ jobs:
           4. 之后可正常双击使用
           
           💡 详细的macOS使用说明请查看 [MACOS_USER_GUIDE.md](https://github.com/QSXDY/cursor-tool-free/blob/main/MACOS_USER_GUIDE.md)
+          
+          **Linux (Ubuntu/Debian):**
+          ```bash
+          # 下载DEB包后安装
+          sudo dpkg -i CursorToolFree-Ubuntu.deb
+          
+          # 如果有依赖问题，运行
+          sudo apt-get install -f
+          
+          # 启动应用
+          cursortool-free
+          # 或从应用程序菜单启动
+          ```
+          
+          **Linux (其他发行版):**
+          1. 下载 `CursorToolFree-Linux.AppImage`
+          2. 添加执行权限：`chmod +x CursorToolFree-Linux.AppImage`
+          3. 双击运行或命令行：`./CursorToolFree-Linux.AppImage`
           
           ---
           
@@ -251,3 +270,139 @@ jobs:
       with:
         tag_name: ${{ needs.create-release.outputs.tag_name }}
         files: ./CursorToolFree-Linux.AppImage
+
+  build-deb:
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+    
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y dpkg-dev fakeroot
+    
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements_browser.txt
+        pip install pyinstaller
+    
+    - name: Build executable
+      run: |
+        pyinstaller CursorToolFree.spec --clean --noconfirm
+    
+    - name: Build DEB package
+      run: |
+        # 获取版本号
+        VERSION="${{ needs.create-release.outputs.tag_name }}"
+        VERSION="${VERSION#v}"  # 移除v前缀
+        
+        # 创建DEB包目录结构
+        DEB_DIR="cursortool-free_${VERSION}_amd64"
+        mkdir -p "${DEB_DIR}/DEBIAN"
+        mkdir -p "${DEB_DIR}/opt/cursortool-free"
+        mkdir -p "${DEB_DIR}/usr/share/applications"
+        mkdir -p "${DEB_DIR}/usr/share/icons/hicolor/512x512/apps"
+        mkdir -p "${DEB_DIR}/usr/bin"
+        
+        # 复制可执行文件和资源
+        cp dist/CursorToolFree "${DEB_DIR}/opt/cursortool-free/"
+        cp -r resources "${DEB_DIR}/opt/cursortool-free/"
+        cp icon.png "${DEB_DIR}/usr/share/icons/hicolor/512x512/apps/cursortool-free.png"
+        
+        # 创建启动脚本
+        cat > "${DEB_DIR}/usr/bin/cursortool-free" << 'LAUNCHER_EOF'
+        #!/bin/bash
+        cd /opt/cursortool-free
+        exec ./CursorToolFree "$@"
+        LAUNCHER_EOF
+        chmod +x "${DEB_DIR}/usr/bin/cursortool-free"
+        
+        # 创建.desktop文件
+        cat > "${DEB_DIR}/usr/share/applications/cursortool-free.desktop" << 'DESKTOP_EOF'
+        [Desktop Entry]
+        Type=Application
+        Name=Cursor Tool Free
+        Comment=Cursor账号管理工具 - 免费精简版
+        Exec=/usr/bin/cursortool-free
+        Icon=cursortool-free
+        Categories=Development;Utility;
+        Terminal=false
+        StartupWMClass=CursorToolFree
+        Keywords=cursor;account;manager;开发;账号;管理;
+        GenericName=Cursor Account Manager
+        DESKTOP_EOF
+        
+        # 创建control文件
+        cat > "${DEB_DIR}/DEBIAN/control" << CONTROL_EOF
+        Package: cursortool-free
+        Version: ${VERSION}
+        Section: utils
+        Priority: optional
+        Architecture: amd64
+        Depends: libqt6core6, libqt6gui6, libqt6widgets6
+        Maintainer: Cursor Tool Free Team <support@example.com>
+        Description: Cursor账号管理工具 - 免费精简版
+         专业的Cursor账号管理系统，提供现代化用户界面、
+         本地化数据存储、浏览器Cookie导入支持等功能。
+         .
+         主要功能：
+          - 账号管理：添加、删除、编辑Cursor账号信息
+          - Cookie导入：从浏览器导入账号Cookie
+          - 状态监控：实时显示账号状态和使用情况
+          - 数据安全：本地存储，保护用户隐私
+        Homepage: https://github.com/QSXDY/cursor-tool-free
+        CONTROL_EOF
+        
+        # 创建postinst脚本（安装后执行）
+        cat > "${DEB_DIR}/DEBIAN/postinst" << 'POSTINST_EOF'
+        #!/bin/bash
+        set -e
+        
+        # 更新桌面数据库
+        if command -v update-desktop-database >/dev/null 2>&1; then
+            update-desktop-database -q
+        fi
+        
+        # 更新图标缓存
+        if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+            gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor || true
+        fi
+        
+        echo "Cursor Tool Free安装完成！"
+        echo "运行命令: cursortool-free"
+        echo "或从应用程序菜单启动"
+        
+        exit 0
+        POSTINST_EOF
+        chmod +x "${DEB_DIR}/DEBIAN/postinst"
+        
+        # 创建prerm脚本（卸载前执行）
+        cat > "${DEB_DIR}/DEBIAN/prerm" << 'PRERM_EOF'
+        #!/bin/bash
+        set -e
+        exit 0
+        PRERM_EOF
+        chmod +x "${DEB_DIR}/DEBIAN/prerm"
+        
+        # 构建DEB包
+        dpkg-deb --build "${DEB_DIR}"
+        mv "${DEB_DIR}.deb" "CursorToolFree-Ubuntu.deb"
+        
+        # 显示包信息
+        echo "📦 DEB包信息："
+        dpkg-deb --info "CursorToolFree-Ubuntu.deb"
+        ls -lh "CursorToolFree-Ubuntu.deb"
+    
+    - name: Upload to release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ needs.create-release.outputs.tag_name }}
+        files: ./CursorToolFree-Ubuntu.deb

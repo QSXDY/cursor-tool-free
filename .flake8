@@ -1,0 +1,26 @@
+[flake8]
+# Flake8配置文件
+
+max-line-length = 120
+
+# 忽略与black冲突的规则
+# E203: whitespace before ':' (black在切片时会添加空格)
+# W503: line break before binary operator (black的换行风格)
+ignore = E203, W503
+
+# 排除目录
+exclude =
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    build,
+    dist,
+    *.egg-info,
+    .eggs,
+    .tox
+
+# 每个文件的最大复杂度
+# 暂时设置为25，后续逐步优化复杂函数
+max-complexity = 25
+

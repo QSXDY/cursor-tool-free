@@ -100,7 +100,10 @@ chmod +x build_macos.sh
 ### Linux
 - **Cursor检测**: 系统安装、AppImage、Snap、Flatpak
 - **浏览器支持**: Chrome、Chromium、Firefox、系统默认
-- **安装方式**: APT/YUM/Pacman、Snap、Flatpak、AppImage
+- **安装方式**: 
+  - **DEB包**（推荐Ubuntu/Debian用户）
+  - **AppImage**（通用，支持所有发行版）
+  - **源码安装**
 
 ## 🔧 系统要求
 
@@ -154,6 +157,58 @@ chmod +x build_macos.sh
 ```bash
 # 安装create-dmg用于创建DMG安装包
 brew install create-dmg
+```
+
+## 🐧 Ubuntu/Debian安装说明
+
+### 使用DEB包安装（推荐）
+
+从GitHub Releases下载 `CursorToolFree-Ubuntu.deb`，然后：
+
+```bash
+# 方法1：使用dpkg安装
+sudo dpkg -i CursorToolFree-Ubuntu.deb
+
+# 如果有依赖问题，自动安装依赖
+sudo apt-get install -f
+
+# 方法2：使用apt安装（自动处理依赖）
+sudo apt install ./CursorToolFree-Ubuntu.deb
+```
+
+### 启动应用
+
+```bash
+# 命令行启动
+cursortool-free
+
+# 或从应用程序菜单启动
+# 应用会出现在 "开发" 或 "工具" 分类中
+```
+
+### 卸载
+
+```bash
+sudo apt remove cursortool-free
+# 或
+sudo dpkg -r cursortool-free
+```
+
+### 系统要求
+
+- Ubuntu 20.04+ / Debian 11+
+- 自动安装依赖：libqt6core6, libqt6gui6, libqt6widgets6
+
+### 使用AppImage（通用方法）
+
+如果不想安装到系统，可以使用AppImage：
+
+```bash
+# 下载后添加执行权限
+chmod +x CursorToolFree-Linux.AppImage
+
+# 运行
+./CursorToolFree-Linux.AppImage
 ```
 
 ## 👨‍💻 开发指南
@@ -240,7 +295,8 @@ git push origin v1.0.1
 每次发布会自动生成：
 - **Windows**: 单文件exe，包含所有依赖
 - **macOS**: 标准dmg安装包，支持拖拽安装
-- **Linux**: AppImage便携应用，无需安装
+- **Linux AppImage**: 便携应用，支持所有发行版
+- **Linux DEB**: Ubuntu/Debian专用安装包
 
 ### 🔧 版本管理
 
